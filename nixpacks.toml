@@ -4,18 +4,23 @@ providers = ["node"]
 nixPkgs = ["nodejs_22", "openssl"]
 
 [phases.install]
-# Cache dev dependencies (tsc, vite) in this layer, but ignore scripts to skip heavy binaries
+# Use npm ci for reproducible builds and better caching
+# Only install production dependencies to reduce layer size
 cmds = [
-  "npm install --no-optional --ignore-scripts",
-  "cd frontend && npm install --ignore-scripts"
+  "npm ci --omit=dev --prefer-offline --no-audit",
+  "cd frontend && npm ci --omit=dev --prefer-offline --no-audit"
 ]
 
 [phases.build]
 # Build everything using the root scripts now that tools are installed
+# Install dev-dependencies only for build phase (isolated)
 cmds = [
+  "npm install --prefer-offline --no-audit",
+  "cd frontend && npm install --prefer-offline --no-audit",
   "npx prisma generate",
   "npm run build"
 ]
 
 [start]
-cmd = "npx prisma migrate deploy && npm run start:prod"
+# Skip prisma generate on startup (done in build), only run migrations
+cmd = "npx prisma migrate deploy --skip-generate && npm run start:prod"

@@ -7,7 +7,7 @@
     "build": "npm run build:frontend && npm run build:backend",
     "build:backend": "npm run prebuild && tsc",
     "build:frontend": "cd frontend && npm run build",
-    "prebuild": "node -e \"const fs = require('fs'); fs.rmSync('dist', { recursive: true, force: true });\"",
+    "prebuild": "node -e \"const fs = require('fs'); fs.rmSync('dist', { recursive: true, force: true }); fs.rmSync('.tsbuildinfo', { force: true });\"",
     "start": "node dist/server.js",
     "start:prod": "cross-env NODE_ENV=production node dist/server.js",
     "start:railway": "npx prisma migrate deploy && cross-env NODE_ENV=production node dist/server.js",
