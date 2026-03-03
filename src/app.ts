@@ -32,6 +32,14 @@ app.get('/ping', (req, res) => {
     res.json({ pong: true, time: new Date().toISOString(), env: process.env.NODE_ENV });
 });
 
+app.get('/env-config.js', (req, res) => {
+    res.type('application/javascript');
+    const env = {
+        VITE_API_URL: process.env.VITE_API_URL || '',
+    };
+    res.send(`window.ENV = ${JSON.stringify(env)};`);
+});
+
 // Middleware
 app.use(cors());
 app.use(express.json());
