@@ -37,6 +37,10 @@ export const validatePromoCode = async (req: Request, res: Response) => {
             return res.status(400).json({ error: 'Promo code expired' });
         }
 
+        if (promo.usageLimit !== null && promo.usageLimit <= 0) {
+            return res.status(400).json({ error: 'Promo code usage limit reached' });
+        }
+
         res.json(promo);
     } catch (error) {
         logger.error(error, 'Error validating promocode');

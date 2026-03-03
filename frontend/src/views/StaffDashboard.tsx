@@ -525,165 +525,181 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ sessionId, roomName, shiftI
 
     return (
         <div className="no-print-bg" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
-            <GlassPanel className="receipt-print-area" style={{ padding: '0', maxWidth: '560px', width: '100%', maxHeight: '90vh', display: 'flex', flexDirection: 'column', background: 'var(--surface)', overflow: 'hidden' }}>
+            <style>{`
+                @media print {
+                    .no-print { display: none !important; }
+                    .print-only { display: block !important; }
+                    .receipt-print-area { box-shadow: none !important; border: none !important; background: #fff !important; color: #000 !important; width: 100% !important; max-width: 100% !important; padding: 0 !important; }
+                    .receipt-content { padding: 0 !important; overflow: visible !important; }
+                    .no-print-bg { background: none !important; position: static !important; padding: 0 !important; }
+                    .glass-panel { background: none !important; border: none !important; backdrop-filter: none !important; }
+                    .receipt-summary-box { background: #f9f9f9 !important; border: 1px solid #000 !important; color: #000 !important; }
+                    .receipt-divider { border-top: 1px dashed #000 !important; }
+                    .mono { font-family: monospace !important; font-weight: bold !important; }
+                }
+                .mono { font-family: 'JetBrains Mono', 'Roboto Mono', monospace; }
+                .receipt-divider { height: 1px; border-top: 1px dashed var(--border); margin: 12px 0; }
+                .receipt-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 6px; }
+            `}</style>
+            <GlassPanel className="receipt-print-area" style={{ padding: '0', maxWidth: '520px', width: '100%', maxHeight: '95vh', display: 'flex', flexDirection: 'column', background: 'var(--surface)', overflow: 'hidden', border: '1px solid var(--border)' }}>
                 {/* Header (Sticky) */}
-                <div className="no-print" style={{ padding: '24px 28px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--surface)', zIndex: 10, flexShrink: 0 }}>
+                <div className="no-print" style={{ padding: '20px 24px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.03)', zIndex: 10, flexShrink: 0 }}>
                     <div>
-                        <div style={{ fontWeight: '700', fontSize: '18px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <div style={{ fontWeight: '800', fontSize: '16px', display: 'flex', alignItems: 'center', gap: 10, letterSpacing: '0.5px' }}>
                             <Receipt size={18} color="var(--primary)" />
-                            {step === 'receipt' ? 'Session Receipt' : 'Checkout'}
+                            {step === 'receipt' ? 'SESSION RECEIPT' : 'CHECKOUT'}
                         </div>
-                        <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: 3 }}>
-                            {roomName}{elapsed ? ` • ${elapsed}` : ''}
+                        <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: 4 }}>
+                            {roomName} {elapsed ? ` • ${elapsed}` : ''}
                         </div>
                     </div>
-                    <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
-                        <X size={20} />
+                    <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.05)', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '8px', borderRadius: '50%', display: 'flex' }}>
+                        <X size={18} />
                     </button>
                 </div>
 
-                {/* Print Header (Only visible when printing) */}
-                <div className="print-only" style={{ display: 'none', textAlign: 'center', padding: '10px 0', borderBottom: '1px dashed #000', marginBottom: '15px' }}>
-                    <h2 style={{ margin: '0 0 5px 0', fontSize: '22px', fontWeight: '800', letterSpacing: '1px' }}>SQUAD POS</h2>
-                    <div style={{ fontSize: '14px', marginBottom: '2px' }}>Session Receipt</div>
-                    <div style={{ fontSize: '12px', color: '#333' }}>{new Date().toLocaleString()}</div>
-                    <div style={{ fontSize: '11px', marginTop: '5px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                        Staff: {staffName} | ID: {sessionId.slice(0, 8)}
-                    </div>
+                {/* Print Header */}
+                <div className="print-only" style={{ display: 'none', textAlign: 'center', padding: '20px 0 10px 0' }}>
+                    <div style={{ fontSize: '28px', fontWeight: '900', letterSpacing: '2px', marginBottom: '4px' }}>SQUAD POS</div>
+                    <div style={{ fontSize: '14px', textTransform: 'uppercase', letterSpacing: '1px', opacity: 0.8 }}>Official Receipt</div>
+                    <div className="receipt-divider" style={{ width: '60px', margin: '15px auto' }} />
                 </div>
 
                 {/* Scrollable Content Area */}
-                <div className="receipt-content" style={{ padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: '24px', flex: 1, overflowY: 'auto' }}>
-                    {/* Loading / Error */}
-                    {loading && <div className="no-print" style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '40px 0' }}>Loading session…</div>}
+                <div className="receipt-content" style={{ padding: '24px 28px', display: 'flex', flexDirection: 'column', flex: 1, overflowY: 'auto' }}>
+                    {/* Metadata Section */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '24px', fontSize: '12px' }}>
+                        <div>
+                            <span style={{ color: 'var(--text-muted)', display: 'block', textTransform: 'uppercase', fontSize: '10px', marginBottom: '2px' }}>Date & Time</span>
+                            <span style={{ fontWeight: '600' }}>{new Date().toLocaleString()}</span>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                            <span style={{ color: 'var(--text-muted)', display: 'block', textTransform: 'uppercase', fontSize: '10px', marginBottom: '2px' }}>Staff / ID</span>
+                            <span style={{ fontWeight: '600' }}>{staffName} / {sessionId.slice(0, 8)}</span>
+                        </div>
+                    </div>
+
+                    {loading && <div className="no-print" style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '40px 0' }}>Loading session details…</div>}
                     {error && (
-                        <div className="no-print" style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--danger)', fontSize: '13px' }}>
+                        <div className="no-print" style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--danger)', fontSize: '13px', background: 'rgba(255,82,82,0.1)', padding: '12px', borderRadius: '8px' }}>
                             <AlertCircle size={16} /> {error}
                         </div>
                     )}
 
                     {data && step === 'receipt' && (
                         <>
-                            {/* Room charge */}
-                            <div>
-                                <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '12px' }}>Room Charge</div>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', padding: '8px 0' }}>
-                                    <div style={{ flex: 1, minWidth: 0 }}>
-                                        <div style={{ fontWeight: '600' }}>{roomName} (Session)</div>
-                                        <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                                            {b!.billableMinutes} min @ EGP {fmt(b!.hourlyPrice)}/hr
+                            {/* Room Usage */}
+                            <div style={{ marginBottom: '20px' }}>
+                                <div style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1.5px', marginBottom: '10px', fontWeight: '700' }}>Room Usage</div>
+                                <div className="receipt-row">
+                                    <div style={{ flex: 1 }}>
+                                        <div style={{ fontWeight: '700', fontSize: '14px' }}>{roomName}</div>
+                                        <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                                            {b!.billableMinutes} mins @ EGP {fmt(b!.hourlyPrice)}/hr
                                             {((s as any).totalPausedMs > 0 || (s as any).isPaused) && (
-                                                <span style={{ color: 'var(--primary)', fontWeight: '600' }}> (Paused duration excluded)</span>
+                                                <div style={{ color: 'var(--primary)', fontWeight: '600', marginTop: '2px' }}>• Paused time excluded</div>
                                             )}
                                         </div>
                                     </div>
-                                    <span style={{ fontWeight: '600', marginLeft: '16px', alignSelf: 'center' }}>EGP {fmt(b!.roomAmount)}</span>
+                                    <div className="mono" style={{ fontWeight: '700', fontSize: '14px' }}>EGP {fmt(b!.roomAmount)}</div>
                                 </div>
                                 <div className="receipt-divider" />
                             </div>
 
-                            {/* Orders */}
+                            {/* Orders Section */}
                             {s!.orders.length > 0 && (
-                                <div>
-                                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '12px' }}>
-                                        Orders ({s!.orders.length})
-                                    </div>
-                                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                <div style={{ marginBottom: '20px' }}>
+                                    <div style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1.5px', marginBottom: '10px', fontWeight: '700' }}>Orders Breakdown</div>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                         {s!.orders.map(order => (
-                                            <div key={order.id} style={{ padding: '4px 0' }}>
+                                            <div key={order.id} style={{ marginBottom: '4px' }}>
                                                 {order.items.map(item => (
-                                                    <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', padding: '2px 0' }}>
-                                                        <span style={{ flex: 1, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
-                                                            {item.product?.name ?? 'Item'} <span style={{ color: 'var(--text-muted)', fontSize: '11px' }}>x{item.qty}</span>
-                                                        </span>
-                                                        <span style={{ fontWeight: '600' }}>EGP {fmt(item.total)}</span>
+                                                    <div key={item.id} className="receipt-row" style={{ fontSize: '13px' }}>
+                                                        <div style={{ flex: 1 }}>
+                                                            <div style={{ fontWeight: '600' }}>{item.product?.name ?? 'Item'}</div>
+                                                            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Qty: {item.qty} × EGP {fmt(item.unitPrice)}</div>
+                                                        </div>
+                                                        <div className="mono" style={{ fontWeight: '600' }}>EGP {fmt(item.total)}</div>
                                                     </div>
                                                 ))}
-                                                <div className="receipt-divider" />
                                             </div>
                                         ))}
                                     </div>
+                                    <div className="receipt-divider" />
                                 </div>
                             )}
 
-                            {/* Billing summary (Adjustments only) */}
-                            {(() => {
-                                const adjustments = [
-                                    ...(b!.discount > 0 ? [{ label: 'Discount', value: -b!.discount }] : []),
-                                    ...(b!.serviceFee > 0 ? [{ label: 'Service fee', value: b!.serviceFee }] : []),
-                                    ...(b!.tax > 0 ? [{ label: 'Tax', value: b!.tax }] : []),
-                                    ...(b!.tip > 0 ? [{ label: 'Tip', value: b!.tip }] : []),
-                                ];
-                                if (adjustments.length === 0 && !promoDiscount) return (
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '14px 0', fontSize: '20px', fontWeight: '900', borderTop: '2px solid var(--text)', marginTop: '20px' }}>
-                                        <span>TOTAL</span>
-                                        <span>EGP {fmt(finalDue)}</span>
-                                    </div>
-                                );
+                            {/* Final Calculations */}
+                            <div style={{ marginTop: 'auto' }}>
+                                <div className="receipt-row" style={{ fontSize: '14px', marginBottom: '12px' }}>
+                                    <span style={{ color: 'var(--text-muted)', fontWeight: '600' }}>SUBTOTAL</span>
+                                    <span style={{ fontWeight: '700' }} className="mono">EGP {fmt(b!.roomAmount + b!.ordersAmount)}</span>
+                                </div>
 
-                                return (
-                                    <>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', fontSize: '14px', borderTop: '2px solid var(--border)', marginTop: '20px' }}>
-                                            <span style={{ color: 'var(--text-muted)' }}>Subtotal</span>
-                                            <span style={{ fontWeight: '600' }}>EGP {fmt(b!.roomAmount + b!.ordersAmount)}</span>
-                                        </div>
-                                        <div className="receipt-summary-box" style={{ borderRadius: '10px', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)', overflow: 'hidden', marginTop: '10px' }}>
+                                {(() => {
+                                    const adjustments = [
+                                        ...(promoDiscount ? [{ label: 'Promo Discount', value: -(baseFinalTotal - finalDue), isPromo: true }] : []),
+                                        ...(b!.discount > 0 && !promoDiscount ? [{ label: 'Discount', value: -b!.discount }] : []),
+                                        ...(b!.serviceFee > 0 ? [{ label: 'Service Fee', value: b!.serviceFee }] : []),
+                                        ...(b!.tax > 0 ? [{ label: 'Tax', value: b!.tax }] : []),
+                                        ...(b!.tip > 0 ? [{ label: 'Included Tip', value: b!.tip }] : []),
+                                    ];
+
+                                    if (adjustments.length === 0) return null;
+
+                                    return (
+                                        <div className="receipt-summary-box" style={{ borderRadius: '12px', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', padding: '12px 16px', marginBottom: '20px' }}>
                                             {adjustments.map((row, i) => (
-                                                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 16px', borderBottom: i < adjustments.length - 1 ? '1px solid var(--border)' : 'none', fontSize: '13px' }}>
-                                                    <span style={{ color: 'var(--text-muted)' }}>{row.label}</span>
-                                                    <span style={{ color: row.value < 0 ? 'var(--primary)' : 'var(--text)', whiteSpace: 'nowrap', marginLeft: '12px' }}>
-                                                        {row.value < 0 ? '-' : ''} EGP {fmt(Math.abs(row.value))}
+                                                <div key={i} className="receipt-row" style={{ fontSize: '12px', marginBottom: i === adjustments.length - 1 ? 0 : '8px' }}>
+                                                    <span style={{ color: (row as any).isPromo ? 'var(--primary)' : 'var(--text-muted)', fontWeight: (row as any).isPromo ? '700' : '500' }}>{row.label}</span>
+                                                    <span className="mono" style={{ color: row.value < 0 ? 'var(--primary)' : 'var(--text)', fontWeight: '600' }}>
+                                                        {row.value < 0 ? '-' : '+'} EGP {fmt(Math.abs(row.value))}
                                                     </span>
                                                 </div>
                                             ))}
                                         </div>
-                                        {promoDiscount && (
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 16px', fontSize: '13px', color: 'var(--primary)', fontWeight: '600' }}>
-                                                <span>Promo Discount</span>
-                                                <span style={{ whiteSpace: 'nowrap' }}>- EGP {fmt(baseFinalTotal - finalDue)}</span>
-                                            </div>
-                                        )}
-                                        <div className="receipt-print-total" style={{ display: 'flex', justifyContent: 'space-between', padding: '14px 0', fontSize: '20px', fontWeight: '900', borderTop: '2px solid var(--text)', marginTop: '20px' }}>
-                                            <span>TOTAL</span>
-                                            <span>EGP {fmt(finalDue)}</span>
-                                        </div>
-                                    </>
-                                );
-                            })()}
+                                    );
+                                })()}
+
+                                <div className="receipt-print-total" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 0', borderTop: '2px solid var(--text)', borderBottom: '2px solid var(--text)', margin: '10px 0 20px 0' }}>
+                                    <span style={{ fontSize: '18px', fontWeight: '900', letterSpacing: '1px' }}>TOTAL DUE</span>
+                                    <span style={{ fontSize: '24px', fontWeight: '900' }} className="mono">EGP {fmt(finalDue)}</span>
+                                </div>
+                            </div>
 
                             {/* Print Footer */}
-                            <div className="print-only" style={{ display: 'none', textAlign: 'center', marginTop: '30px', paddingTop: '15px' }}>
-                                <div className="receipt-divider" />
-                                <div style={{ fontSize: '14px', fontWeight: '700', marginBottom: '5px' }}>THANK YOU!</div>
-                                <div style={{ fontSize: '11px', color: '#333' }}>Please come again soon</div>
-                                <div style={{ fontSize: '10px', marginTop: '10px', opacity: 0.6 }}>Software by SQUAD</div>
+                            <div className="print-only" style={{ display: 'none', textAlign: 'center', marginTop: '20px' }}>
+                                <div style={{ fontSize: '14px', fontWeight: '900', letterSpacing: '2px', marginBottom: '4px' }}>THANK YOU</div>
+                                <div style={{ fontSize: '11px', opacity: 0.7 }}>SQUAD POS • Managed Efficiency</div>
                             </div>
 
                             {/* Promo Code Input */}
-                            <div className="no-print" style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', marginTop: '16px' }}>
+                            <div className="no-print" style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', marginTop: '10px' }}>
                                 <div style={{ flex: 1 }}>
-                                    <input
-                                        placeholder="Promo Code"
-                                        value={promoCode}
-                                        onChange={e => {
-                                            setPromoCode(e.target.value);
-                                            setPromoDiscount(null);
-                                            setPromoError('');
-                                            recalculateAmount(baseFinalTotal, null);
-                                        }}
-                                        disabled={loadingPromo}
-                                        style={{ width: '100%', padding: '10px 14px', background: 'rgba(255,255,255,0.06)', border: `1px solid ${promoError ? 'var(--danger)' : promoDiscount ? 'var(--primary)' : 'var(--border)'}`, color: 'var(--text)', borderRadius: '10px', boxSizing: 'border-box', fontSize: '14px' }}
-                                    />
-                                    {promoError && <div style={{ fontSize: '12px', color: 'var(--danger)', marginTop: '4px' }}>{promoError}</div>}
-                                    {promoDiscount && <div style={{ fontSize: '12px', color: 'var(--primary)', marginTop: '4px' }}>Promo applied!</div>}
+                                    <div style={{ position: 'relative' }}>
+                                        <input
+                                            placeholder="Promo Code"
+                                            value={promoCode}
+                                            onChange={e => {
+                                                setPromoCode(e.target.value);
+                                                setPromoDiscount(null);
+                                                setPromoError('');
+                                            }}
+                                            disabled={loadingPromo}
+                                            style={{ width: '100%', padding: '12px 14px', background: 'rgba(255,255,255,0.05)', border: `1px solid ${promoError ? 'var(--danger)' : promoDiscount ? 'var(--primary)' : 'var(--border)'}`, color: 'var(--text)', borderRadius: '10px', boxSizing: 'border-box', fontSize: '14px' }}
+                                        />
+                                        {promoDiscount && <CheckCircle size={16} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--primary)' }} />}
+                                    </div>
+                                    {promoError && <div style={{ fontSize: '11px', color: 'var(--danger)', marginTop: '4px', paddingLeft: '4px' }}>{promoError}</div>}
                                 </div>
-                                <Button variant="secondary" onClick={() => void validatePromo()} loading={loadingPromo} style={{ padding: '10px 16px', height: '40.5px' }}>
+                                <Button variant="secondary" onClick={() => void validatePromo()} loading={loadingPromo} style={{ padding: '0 20px', height: '42px', borderRadius: '10px' }}>
                                     Apply
                                 </Button>
                             </div>
                         </>
                     )}
                 </div>
+
 
                 {/* Footer Actions (Sticky) */}
                 {data && step === 'receipt' && (
@@ -2011,24 +2027,24 @@ const StaffDashboard: React.FC<StaffDashboardProps> = ({ rooms, fetchRooms, curr
                             shiftStats.paymentsByMode.map(mode => (
                                 <div key={mode.name} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
                                     <span>{mode.name}</span>
-                                    <span style={{ fontWeight: '600' }}>{fmt(mode.amount)}</span>
+                                    <span style={{ fontWeight: '600', fontFamily: 'monospace' }}>{fmt(mode.amount)}</span>
                                 </div>
                             ))
                         ) : (
                             <>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
                                     <span>Cash</span>
-                                    <span style={{ fontWeight: '600' }}>{fmt(shiftStats?.paymentsCash ?? 0)}</span>
+                                    <span style={{ fontWeight: '600', fontFamily: 'monospace' }}>{fmt(shiftStats?.paymentsCash ?? 0)}</span>
                                 </div>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
                                     <span>Card</span>
-                                    <span style={{ fontWeight: '600' }}>{fmt(shiftStats?.paymentsCard ?? 0)}</span>
+                                    <span style={{ fontWeight: '600', fontFamily: 'monospace' }}>{fmt(shiftStats?.paymentsCard ?? 0)}</span>
                                 </div>
                             </>
                         )}
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '6px', paddingTop: '6px', borderTop: '1px solid #000', fontWeight: 'bold' }}>
                             <span>Total Payments</span>
-                            <span>{fmt((shiftStats?.paymentsByMode || []).reduce((sum, m) => sum + m.amount, 0) || (shiftStats?.paymentsCash || 0) + (shiftStats?.paymentsCard || 0))}</span>
+                            <span style={{ fontFamily: 'monospace' }}>{fmt((shiftStats?.paymentsByMode || []).reduce((sum, m) => sum + m.amount, 0) || (shiftStats?.paymentsCash || 0) + (shiftStats?.paymentsCard || 0))}</span>
                         </div>
                     </div>
 
@@ -2038,12 +2054,12 @@ const StaffDashboard: React.FC<StaffDashboardProps> = ({ rooms, fetchRooms, curr
                             {shiftStats.expenses.map((exp: any) => (
                                 <div key={exp.id} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: '12px' }}>
                                     <span>{exp.category} {exp.note ? `- ${exp.note}` : ''}</span>
-                                    <span style={{ fontWeight: '600' }}>-{fmt(exp.amount)}</span>
+                                    <span style={{ fontWeight: '600', fontFamily: 'monospace' }}>-{fmt(exp.amount)}</span>
                                 </div>
                             ))}
                             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '6px', paddingTop: '6px', borderTop: '1px solid #000', fontWeight: 'bold' }}>
                                 <span>Total Expenses</span>
-                                <span style={{ color: '#d32f2f' }}>-{fmt(shiftStats.expenses.reduce((sum: number, e: any) => sum + e.amount, 0))}</span>
+                                <span style={{ color: '#d32f2f', fontFamily: 'monospace' }}>-{fmt(shiftStats.expenses.reduce((sum: number, e: any) => sum + e.amount, 0))}</span>
                             </div>
                         </div>
                     )}
@@ -2070,7 +2086,7 @@ const StaffDashboard: React.FC<StaffDashboardProps> = ({ rooms, fetchRooms, curr
                                                 {Math.round((new Date(s.endTime).getTime() - new Date(s.startTime).getTime()) / 60000)}m
                                                 {s.totalPausedMs > 0 && <span style={{ fontSize: '9px', color: 'var(--primary)' }}> (-{Math.round(s.totalPausedMs / 60000)}m)</span>}
                                             </td>
-                                            <td style={{ textAlign: 'right', fontWeight: '600' }}>
+                                            <td style={{ textAlign: 'right', fontWeight: '600', fontFamily: 'monospace' }}>
                                                 EGP {fmt(s.finalTotal)}
                                                 {s.discount > 0 && <span style={{ fontSize: '9px', color: 'var(--primary)', display: 'block' }}>(-EGP {fmt(s.discount)})</span>}
                                             </td>
@@ -2083,12 +2099,12 @@ const StaffDashboard: React.FC<StaffDashboardProps> = ({ rooms, fetchRooms, curr
 
                     <div className="receipt-print-total" style={{ borderTop: '2px solid #000', paddingTop: '10px', display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: 'bold' }}>
                         <span>TOTAL REVENUE:</span>
-                        <span>{fmt(shiftStats?.totalRevenue || totalRevenue)}</span>
+                        <span style={{ fontFamily: 'monospace' }}>{fmt(shiftStats?.totalRevenue || totalRevenue)}</span>
                     </div>
 
                     <div className="receipt-print-total" style={{ borderTop: '2px solid #000', marginTop: '10px', paddingTop: '10px', display: 'flex', justifyContent: 'space-between', fontSize: '16px', fontWeight: '900' }}>
                         <span>CASH ON HAND:</span>
-                        <span>
+                        <span style={{ fontFamily: 'monospace' }}>
                             {fmt(
                                 (shiftStats?.paymentsByMode?.find(m => m.name.toLowerCase() === 'cash')?.amount || shiftStats?.paymentsCash || 0)
                                 - (shiftStats?.expenses ? shiftStats.expenses.reduce((sum: number, e: any) => sum + e.amount, 0) : 0)

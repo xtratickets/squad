@@ -101,7 +101,7 @@ export const endSession = async (req: any, res: Response) => {
         let discountAmount = 0;
         if (promoCode) {
             const promo = await prisma.promoCode.findUnique({ where: { code: promoCode } });
-            if (promo && promo.active && (promo.usageLimit ?? 0) > 0 && (!promo.expiry || promo.expiry > new Date())) {
+            if (promo && promo.active && (promo.usageLimit === null || promo.usageLimit > 0) && (!promo.expiry || promo.expiry > new Date())) {
                 const durationMs = endTime.getTime() - session.startTime.getTime();
                 const totalPausedMs = (session as any).totalPausedMs || 0;
                 const billableMs = Math.max(0, durationMs - totalPausedMs);
@@ -201,10 +201,13 @@ export const endSession = async (req: any, res: Response) => {
             }
 
             if (promoCode) {
-                await tx.promoCode.update({
-                    where: { code: promoCode },
-                    data: { usageLimit: { decrement: 1 } },
-                });
+                const p = await tx.promoCode.findUnique({ where: { code: promoCode } });
+                if (p && p.usageLimit !== null) {
+                    await tx.promoCode.update({
+                        where: { code: promoCode },
+                        data: { usageLimit: { decrement: 1 } },
+                    });
+                }
             }
 
             return s;
