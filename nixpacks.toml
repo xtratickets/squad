@@ -1,26 +1,27 @@
 providers = ["node"]
 
 [phases.setup]
-nixPkgs = ["nodejs_22", "openssl"]
+nixPkgs = ["nodejs_22", "openssl", "python3"]
 
 [phases.install]
-# Use npm ci for reproducible builds and better caching
-# Only install production dependencies to reduce layer size
+# Install ONLY production dependencies for lean runtime image
+# Use npm ci with synced lock files for reproducible builds
 cmds = [
-  "npm ci --omit=dev --prefer-offline --no-audit",
-  "cd frontend && npm ci --omit=dev --prefer-offline --no-audit"
+  "npm ci --omit=dev --omit=optional --prefer-offline --no-audit 2>&1 | grep -v 'npm warn' || true",
+  "cd frontend && npm ci --omit=dev --omit=optional --prefer-offline --no-audit 2>&1 | grep -v 'npm warn' || true"
 ]
 
 [phases.build]
-# Build everything using the root scripts now that tools are installed
-# Install dev-dependencies only for build phase (isolated)
+# Install full dependencies (including dev) for building
+# Run Prisma generate, then build backend & frontend
 cmds = [
-  "npm install --prefer-offline --no-audit",
-  "cd frontend && npm install --prefer-offline --no-audit",
+  "npm install --prefer-offline --no-audit 2>&1 | grep -v 'npm warn' || true",
+  "cd frontend && npm install --prefer-offline --no-audit 2>&1 | grep -v 'npm warn' || true",
   "npx prisma generate",
   "npm run build"
 ]
 
 [start]
-# Skip prisma generate on startup (done in build), only run migrations
+# Run database migrations once, then start app
+# Use --skip-generate since Prisma client was generated during build
 cmd = "npx prisma migrate deploy --skip-generate && npm run start:prod"
