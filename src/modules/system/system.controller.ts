@@ -116,7 +116,7 @@ export const seedAdmin = async (req: Request, res: Response) => {
         }
 
         logger.info('System seed completed successfully.');
-        res.json({ message: 'System seeded successfully. Default credentials: admin / admin123' });
+        res.json({ message: 'System seeded successfully. Default credentials: admin / admin123', version: 2 });
     } catch (error) {
         logger.error(error, 'Error seeding system');
         res.status(500).json({ error: 'Internal server error during seeding' });
