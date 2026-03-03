@@ -25,6 +25,13 @@ import { errorHandler } from './middleware/error.middleware';
 
 const app = express();
 
+console.log('--- APP.TS LOADING ---');
+logger.info('--- APP.TS INITIALIZING ---');
+
+app.get('/ping', (req, res) => {
+    res.json({ pong: true, time: new Date().toISOString(), env: process.env.NODE_ENV });
+});
+
 // Middleware
 app.use(cors());
 app.use(express.json());

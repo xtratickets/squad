@@ -5,7 +5,7 @@ nixPkgs = ["nodejs", "openssl"]
 cmds = ["npm install", "cd frontend && npm install"]
 
 [phases.build]
-cmds = ["npm run build:frontend", "npx prisma generate", "npx tsc"]
+cmds = ["npm run build:frontend", "npx prisma generate", "rm -rf dist && npx tsc"]
 
 [start]
 cmd = "npx prisma migrate resolve --rolled-back 20260220123408_init && npx prisma migrate deploy && NODE_ENV=production node dist/server.js"
