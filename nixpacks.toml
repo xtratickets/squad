@@ -22,6 +22,6 @@ cmds = [
 ]
 
 [start]
-# Run database migrations once, then start app
-# Use --skip-generate since Prisma client was generated during build
-cmd = "npx prisma migrate deploy --skip-generate && npm run start:prod"
+# Run database migrations (client was already generated during build)
+# Then start the application
+cmd = "npx prisma migrate deploy && npm run start:prod"

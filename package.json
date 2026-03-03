@@ -84,8 +84,5 @@
       "prisma/schema.prisma",
       "prisma/dev.db"
     ]
-  },
-  "prisma": {
-    "seed": "ts-node prisma/seed.ts"
   }
 }

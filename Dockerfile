@@ -69,7 +69,7 @@ EXPOSE 3000
 ENTRYPOINT ["dumb-init", "--"]
 
 # Start application with migrations
-CMD ["sh", "-c", "npx prisma migrate deploy --skip-generate && npm run start:prod"]
+CMD ["sh", "-c", "npx prisma migrate deploy && npm run start:prod"]
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
