@@ -1,0 +1,325 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                  String               @id @default(uuid())
+  username            String               @unique
+  password            String
+  roleId              String
+  role                Role                 @relation(fields: [roleId], references: [id])
+  walletBalance       Float                @default(0)
+  sessionsStarted     Session[]            @relation("SessionOpenedBy")
+  sessionsEnded       Session[]            @relation("SessionClosedBy")
+  ordersStarted       Order[]              @relation("OrderCreatedBy")
+  ownerOrders         Order[]              @relation("OrderOwner")
+  shifts              Shift[]
+  expenses            Expense[]
+  auditLogs           AuditLog[]
+  walletTransactions  WalletTransaction[]
+  reservations        Reservation[]        @relation("ReservationCreatedBy")
+  salaries             Salary[]
+}
+
+model Role {
+  id    String @id @default(uuid())
+  name  String @unique
+  users User[]
+}
+
+model Room {
+  id             String        @id @default(uuid())
+  name           String
+  category       String
+  pricePerHour   Float
+  minMinutes     Int
+  status         String        // 'available', 'occupied', 'cleaning', 'maintenance'
+  sessions       Session[]
+  orders         Order[]
+  reservations   Reservation[]
+}
+
+model Session {
+  id              String         @id @default(uuid())
+  roomId          String
+  room            Room           @relation(fields: [roomId], references: [id])
+  startTime       DateTime       @default(now())
+  endTime         DateTime?
+  openedShiftId   String
+  openedShift     Shift          @relation("ShiftOpenedSessions", fields: [openedShiftId], references: [id])
+  closedShiftId   String?
+  closedShift     Shift?         @relation("ShiftClosedSessions", fields: [closedShiftId], references: [id])
+  openedById      String
+  openedBy        User           @relation("SessionOpenedBy", fields: [openedById], references: [id])
+  closedById      String?
+  closedBy        User?          @relation("SessionClosedBy", fields: [closedById], references: [id])
+  status          String         // 'active', 'closed', 'cancelled'
+  isPaused        Boolean        @default(false)
+  lastPausedAt    DateTime?
+  totalPausedMs      Int         @default(0)
+  sessionCharge   SessionCharge?
+  orders          Order[]
+
+  @@index([roomId, status])
+  @@index([closedShiftId])
+}
+
+model SessionCharge {
+  id               String   @id @default(uuid())
+  sessionId        String   @unique
+  session          Session  @relation(fields: [sessionId], references: [id])
+  shiftId          String
+  durationMinutes  Int
+  billableMinutes  Int
+  hourlyPrice      Float
+  roomAmount       Float
+  ordersAmount     Float
+  discount         Float
+  serviceFee       Float
+  tax              Float
+  tip              Float    @default(0)
+  promoCode        String?
+  finalTotal       Float
+  createdAt        DateTime @default(now())
+}
+
+model Reservation {
+  id          String   @id @default(uuid())
+  roomId      String
+  room        Room     @relation(fields: [roomId], references: [id])
+  startTime   DateTime
+  endTime     DateTime?
+  status      String   // 'pending', 'confirmed', 'checked_in', 'cancelled'
+  guestName   String?
+  guestPhone  String?
+  note        String?
+  createdById String?
+  createdBy   User?    @relation("ReservationCreatedBy", fields: [createdById], references: [id])
+
+  @@index([roomId, startTime])
+}
+
+model Order {
+  id           String       @id @default(uuid())
+  type         String       // 'room', 'regular', 'owner'
+  roomId       String?
+  room         Room?        @relation(fields: [roomId], references: [id])
+  sessionId    String?
+  session      Session?     @relation(fields: [sessionId], references: [id])
+  shiftId      String
+  shift        Shift        @relation(fields: [shiftId], references: [id])
+  status       String       // 'pending', 'approved', 'cancelled'
+  createdById  String
+  createdBy    User         @relation("OrderCreatedBy", fields: [createdById], references: [id])
+  ownerUserId  String?      // set when type='owner'
+  ownerUser    User?        @relation("OrderOwner", fields: [ownerUserId], references: [id])
+  items        OrderItem[]
+  orderCharge  OrderCharge?
+  walletTransaction WalletTransaction?
+  createdAt    DateTime     @default(now())
+
+  @@index([sessionId])
+  @@index([shiftId])
+  @@index([ownerUserId])
+}
+
+model OrderItem {
+  id                String  @id @default(uuid())
+  orderId           String
+  order             Order   @relation(fields: [orderId], references: [id])
+  productId         String
+  product           Product @relation(fields: [productId], references: [id])
+  qty               Int
+  unitPrice         Float
+  originalUnitPrice Float?  // For price override tracking
+  total             Float
+}
+
+model OrderCharge {
+  id         String @id @default(uuid())
+  orderId    String @unique
+  order      Order  @relation(fields: [orderId], references: [id])
+  shiftId    String
+  itemsTotal Float
+  discount   Float
+  serviceFee Float
+  tax        Float
+  tip        Float  @default(0)
+  finalTotal Float
+  createdAt  DateTime @default(now())
+}
+
+model Category {
+  id       String    @id @default(uuid())
+  name     String
+  parentId String?
+  parent   Category? @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children Category[] @relation("CategoryHierarchy")
+  products Product[]
+}
+
+model Product {
+  id             String          @id @default(uuid())
+  name           String
+  categoryId     String
+  category       Category        @relation(fields: [categoryId], references: [id])
+  price          Float
+  cost           Float
+  stockQty       Int
+  imageUrl       String?
+  orderItems     OrderItem[]
+  stockMovements StockMovement[]
+}
+
+model StockMovement {
+  id        String   @id @default(uuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id])
+  qty       Int
+  type      String   // 'deduct', 'add'
+  reference String?
+  createdAt DateTime @default(now())
+
+  @@index([productId])
+}
+
+model PaymentMode {
+  id         String    @id @default(uuid())
+  name       String
+  active     Boolean   @default(true)
+  allowSplit Boolean   @default(false)
+  payments   Payment[]
+}
+
+model Payment {
+  id            String      @id @default(uuid())
+  modeId        String
+  mode          PaymentMode @relation(fields: [modeId], references: [id])
+  amount        Float
+  referenceType String      // 'session', 'order'
+  referenceId   String
+  shiftId       String
+  shift         Shift       @relation(fields: [shiftId], references: [id])
+  receiptUrl    String?
+  createdAt     DateTime    @default(now())
+
+  @@index([referenceType, referenceId])
+  @@index([shiftId])
+}
+
+model Shift {
+  id             String       @id @default(uuid())
+  staffId        String
+  staff          User         @relation(fields: [staffId], references: [id])
+  startTime      DateTime     @default(now())
+  endTime        DateTime?
+  status         String       // 'open', 'closed'
+  openedSessions Session[]    @relation("ShiftOpenedSessions")
+  closedSessions Session[]    @relation("ShiftClosedSessions")
+  orders         Order[]
+  payments       Payment[]
+  expenses       Expense[]
+  salaries       Salary[]
+  stats          ShiftStats?
+}
+
+model ShiftStats {
+  shiftId         String @id
+  shift           Shift  @relation(fields: [shiftId], references: [id])
+  sessionsRevenue Float  @default(0)
+  ordersRevenue   Float  @default(0)
+  paymentsCash    Float  @default(0)
+  paymentsCard    Float  @default(0)
+  paymentsWallet  Float  @default(0)
+  expensesTotal   Float  @default(0)
+  salariesTotal   Float  @default(0)
+  totalRevenue    Float  @default(0)
+  tipsTotal       Float  @default(0) // Separate tracking for tips
+  openingCash     Float  @default(0) // Cash at start
+  cashPhysical    Float  @default(0) // Physical cash counted
+  cashDifference  Float  @default(0) // Discrepancy
+}
+
+model Expense {
+  id        String   @id @default(uuid())
+  shiftId   String
+  shift     Shift    @relation(fields: [shiftId], references: [id])
+  amount    Float
+  category  String
+  createdById String
+  createdBy User     @relation(fields: [createdById], references: [id])
+  createdAt DateTime @default(now())
+}
+
+model Salary {
+  id        String   @id @default(uuid())
+  staffId   String
+  staff     User     @relation(fields: [staffId], references: [id])
+  amount    Float
+  period    String
+  shiftId   String?
+  shift     Shift?   @relation(fields: [shiftId], references: [id])
+  createdAt DateTime @default(now())
+}
+
+model PromoCode {
+  id         String    @id @default(uuid())
+  code       String    @unique
+  type       String    // 'percent', 'fixed'
+  value      Float
+  active     Boolean   @default(true)
+  expiry     DateTime?
+  usageLimit Int?
+  applyTo    String    @default("both") // 'room', 'orders', 'both'
+}
+
+model FeeConfig {
+  id                String @id @default("default")
+  serviceFeePercent Float  @default(0)
+  taxPercent        Float  @default(0)
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  entity    String
+  entityId  String
+  action    String
+  before    String?  // JSON string
+  after     String?  // JSON string
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+}
+
+model ReceiptSnapshot {
+  id           String   @id @default(uuid())
+  type         String   // 'session', 'order'
+  referenceId  String
+  snapshotData String   // JSON string
+  totalAmount  Float
+  createdAt    DateTime @default(now())
+
+  @@index([type, referenceId])
+}
+
+model WalletTransaction {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  amount    Float    // positive = top-up, negative = deduction
+  note      String?
+  orderId   String?  @unique
+  order     Order?   @relation(fields: [orderId], references: [id])
+  shiftId   String
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}

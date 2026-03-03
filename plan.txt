@@ -1,0 +1,571 @@
+1. SYSTEM GOALS
+
+deterministic financial correctness
+
+realtime state reflection
+
+cross-shift accounting accuracy
+
+immutable billing snapshots
+
+high performance under POS load
+
+role-strict permissions
+
+auditability of all financial mutations
+
+2. DOMAIN MODULES
+
+auth
+users
+roles
+rooms
+sessions
+reservations
+orders
+order_items
+products
+categories
+stock
+payments
+shifts
+expenses
+salaries
+promocodes
+fees
+reports
+realtime
+audit
+
+3. CORE ENTITIES (FINAL)
+
+User
+Role
+Room
+Session
+SessionCharge
+Reservation
+Order
+OrderItem
+OrderCharge
+Product
+Category
+StockMovement
+Payment
+PaymentMode
+Shift
+ShiftStats
+Expense
+Salary
+PromoCode
+FeeConfig
+AuditLog
+
+4. ROLE CAPABILITY MATRIX
+
+GUEST
+
+view rooms
+
+view availability
+
+create reservation
+
+create room order (active session only)
+
+STAFF
+
+start session
+
+end session
+
+manage room orders (approve/cancel/add)
+
+create walkin order
+
+apply promocode
+
+view own shift
+
+print shift report
+
+print session receipt
+
+OPERATION
+all STAFF plus:
+
+edit session times after close
+
+edit orders
+
+edit payments
+
+manage reservations
+
+manage stock/products
+
+manage expenses/salaries
+
+manage shifts
+
+view/print any shift
+
+ADMIN
+full control plus:
+
+users/roles
+
+rooms
+
+categories
+
+payment modes
+
+fees/taxes
+
+global reports
+
+5. ROOM & SESSION MODEL
+
+Room
+id, name, category, price_per_hour, min_minutes, status
+
+Session
+id
+room_id
+start_time
+end_time
+opened_shift_id
+closed_shift_id
+opened_by
+closed_by
+status
+
+Constraint:
+UNIQUE(room_id) WHERE status='active'
+
+6. SESSION BILLING SNAPSHOT
+
+SessionCharge
+session_id
+shift_id = closed_shift_id
+duration_minutes
+billable_minutes
+hourly_price
+room_amount
+orders_amount
+discount
+service_fee
+tax
+final_total
+
+Immutable after creation except OPERATION override with audit.
+
+7. RESERVATIONS
+
+Reservation
+room_id
+start_time
+end_time nullable
+status
+
+DB exclusion index prevents overlap with sessions/reservations.
+
+8. ORDERS
+
+Order
+id
+type (room, walkin, owner)
+room_id nullable
+session_id nullable
+shift_id
+status
+created_by
+
+OrderItem
+order_id
+product_id
+qty
+unit_price
+total
+
+OrderCharge
+order_id
+shift_id
+items_total
+discount
+service_fee
+tax
+final_total
+
+9. PRODUCTS & STOCK
+
+Category
+id, name, parent_id
+
+Product
+id, name, category_id, price, cost, stock_qty
+
+StockMovement
+product_id
+qty
+type (deduct/add)
+reference
+
+Stock deducted on order approval only.
+
+10. PAYMENTS
+
+PaymentMode
+id, name, active, allow_split
+
+Payment
+id
+mode_id
+amount
+reference_type
+reference_id
+shift_id
+
+Rule:
+SUM(payments) ≤ charge.final_total
+
+Session payments shift_id forced to closed_shift_id.
+
+11. SHIFTS
+
+Shift
+id
+staff_id
+start_time
+end_time
+status
+
+ShiftStats
+shift_id
+sessions_revenue
+orders_revenue
+payments_cash
+payments_card
+payments_wallet
+expenses_total
+salaries_total
+total_revenue
+
+Incrementally updated.
+
+12. EXPENSES & SALARIES
+
+Expense
+shift_id
+amount
+category
+created_by
+
+Salary
+staff_id
+amount
+period
+shift_id nullable
+
+13. PROMOCODES
+
+PromoCode
+code
+type (percent/fixed)
+value
+active
+expiry
+usage_limit
+
+Applied to session/order → stored in Charge snapshot.
+
+14. FEES CONFIG
+
+FeeConfig
+service_fee_percent
+tax_percent
+
+Used only at charge computation time.
+
+15. REALTIME ARCHITECTURE
+
+Transport: WebSocket
+
+Channels:
+
+room:{room_id}
+session:{session_id}
+shift:{shift_id}
+orders:{room_id}
+
+Server emits full projections after commit.
+
+16. REALTIME EVENTS
+
+session.started
+session.updated
+session.ended
+session.discount_updated
+
+order.created
+order.updated
+order.cancelled
+
+payment.split_updated
+
+shift.totals_updated
+room.state_updated
+
+17. PROJECTIONS
+
+RoomStateProjection
+room_id
+active_session_id
+start_time
+running_total
+unpaid_total
+orders_open
+
+SessionProjection
+session_id
+times
+totals
+paid
+remaining
+orders
+
+ShiftProjection
+ShiftStats row
+
+18. SHIFT OWNERSHIP
+
+Session revenue → closed_shift_id
+Order revenue → order.shift_id
+Payments → payment.shift_id
+
+Cross-shift sessions handled at close.
+
+19. SHIFT REPORTING
+
+Active shift → live calc
+Closed shift → ShiftReportSnapshot
+
+ShiftReportSnapshot
+shift_id
+sessions_revenue
+orders_revenue
+payments_by_mode
+expenses
+salaries
+net
+generated_at
+
+STAFF: own shift
+OPERATION/ADMIN: any shift
+
+20. RECEIPTS
+
+SessionReceiptSnapshot
+session_id
+times
+totals
+payments_breakdown
+
+OrderReceiptSnapshot
+order_id
+totals
+payments_breakdown
+
+Created at close or first print. Immutable.
+
+21. CALCULATION SERVICES
+
+SessionService
+
+start
+
+end
+
+edit times
+
+apply discount
+
+BillingService
+
+compute SessionCharge
+
+compute OrderCharge
+
+fees/tax
+
+OrderService
+
+create/update/approve
+
+PaymentService
+
+split
+
+validate sum
+
+shift assignment
+
+ShiftService
+
+open/close
+
+stats delta
+
+ReservationService
+
+create/update
+
+StockService
+
+deduct/reverse
+
+22. MUTATION FLOW (STANDARD)
+
+transaction
+lock charge/session/order
+apply change
+recompute charge if needed
+update ShiftStats delta
+commit
+emit realtime projections
+
+23. DATABASE INDEXES
+
+sessions(room_id,status)
+sessions(closed_shift_id)
+orders(session_id)
+orders(shift_id)
+payments(reference_type,reference_id)
+payments(shift_id)
+reservations(room_id,start_time)
+order_items(order_id)
+stock_movements(product_id)
+shift_stats(shift_id PK)
+
+24. CONSTRAINTS
+
+single active session per room
+no reservation overlap
+payment ≤ charge
+stock ≥ 0
+session must close before shift close or auto-reassign
+category cannot delete with products
+
+25. PERFORMANCE RULES
+
+all totals read from Charge or ShiftStats
+no runtime SUM on items
+no joins in realtime fetch
+denormalize shift_id in charges/payments/orders
+incremental stats only
+snapshot receipts
+
+26. AUDIT
+
+AuditLog
+entity
+entity_id
+action
+before
+after
+user_id
+time
+
+Required for:
+
+session edit
+discount change
+payment edit
+order cancel
+price override
+
+27. API SURFACE
+
+PUBLIC
+GET /rooms
+GET /rooms/{id}/state
+GET /menu
+POST /guest/reservations
+POST /guest/orders
+
+STAFF
+POST /sessions/start
+POST /sessions/end
+PATCH /orders/{id}
+POST /payments
+GET /shift/me
+GET /shift/me/report
+GET /sessions/{id}/receipt
+
+OPERATION
+PATCH /sessions/{id}
+PATCH /orders/{id}
+PATCH /payments/{id}
+GET /shift/{id}/report
+POST /expenses
+POST /stock
+
+ADMIN
+POST /users
+POST /rooms
+POST /categories
+POST /payment-modes
+PATCH /fees
+GET /reports/global
+
+28. REALTIME SLA
+
+write → emit < 50ms
+room state read < 5ms
+shift totals read < 5ms
+session close < 20ms
+
+29. UI SURFACES
+
+Guest QR
+Room POS
+Staff POS
+Shift Dashboard
+Admin Panel
+Reports/Print
+
+All driven by projections only.
+
+30. EXECUTION ORDER
+
+DB schema + constraints
+
+charge computation engine
+
+session lifecycle
+
+orders lifecycle
+
+payments split engine
+
+shift stats incremental
+
+realtime layer
+
+receipts snapshots
+
+reports
+
+admin config
+
+audit
+
+performance validation
+
+31. ACCOUNTING AUTHORITY
+
+SessionCharge.final_total
+OrderCharge.final_total
+Payment.amount
+ShiftStats
