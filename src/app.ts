@@ -1,5 +1,6 @@
 import express from 'express';
 import path from 'path';
+import fs from 'fs';
 import cors from 'cors';
 import { logger } from './utils/logger';
 import systemRoutes from './modules/system/system.routes';
@@ -60,8 +61,14 @@ app.get('/health', (req, res) => {
 });
 
 // Serve static assets in production
-if (process.env.NODE_ENV === 'production') {
-    app.use(express.static(path.join(__dirname, '../frontend/dist')));
+const isProd = process.env.NODE_ENV === 'production' || process.env.PORT !== '3001';
+logger.info({ nodeEnv: process.env.NODE_ENV, isProd }, 'Environment check for static serving');
+
+if (isProd) {
+    const staticPath = path.join(__dirname, '../frontend/dist');
+    logger.info({ staticPath, exists: fs.existsSync(staticPath) }, 'Serving static files');
+
+    app.use(express.static(staticPath));
 
     app.get('*', (req, res) => {
         // Skip API routes
