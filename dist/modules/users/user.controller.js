@@ -3,16 +3,30 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getRoles = exports.updateUser = exports.createUser = exports.getUsers = void 0;
+exports.getUsersList = exports.deleteUser = exports.getRoles = exports.updateUser = exports.createUser = exports.getUsers = void 0;
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
 const prisma_service_1 = require("../../services/prisma.service");
 const logger_1 = require("../../utils/logger");
 const getUsers = async (req, res) => {
     try {
-        const users = await prisma_service_1.prisma.user.findMany({
-            include: { role: true },
+        const page = parseInt(req.query.page) || 1;
+        const pageSize = parseInt(req.query.pageSize) || 50;
+        const [users, total] = await Promise.all([
+            prisma_service_1.prisma.user.findMany({
+                include: { role: true },
+                skip: (page - 1) * pageSize,
+                take: pageSize,
+                orderBy: { username: 'asc' }, // Ensure consistent pagination order
+            }),
+            prisma_service_1.prisma.user.count()
+        ]);
+        res.json({
+            data: users,
+            total,
+            page,
+            pageSize,
+            totalPages: Math.ceil(total / pageSize)
         });
-        res.json(users);
     }
     catch (error) {
         logger_1.logger.error(error, 'Error fetching users');
@@ -79,3 +93,41 @@ const getRoles = async (req, res) => {
     }
 };
 exports.getRoles = getRoles;
+const deleteUser = async (req, res) => {
+    const id = req.params.id;
+    try {
+        await prisma_service_1.prisma.user.delete({
+            where: { id },
+        });
+        res.status(204).send();
+    }
+    catch (error) {
+        logger_1.logger.error(error, 'Error deleting user');
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+exports.deleteUser = deleteUser;
+// For selection lists (e.g. owners), returns simplified objects
+const getUsersList = async (req, res) => {
+    try {
+        const users = await prisma_service_1.prisma.user.findMany({
+            where: {
+                role: {
+                    name: 'OWNER'
+                }
+            },
+            select: {
+                id: true,
+                username: true,
+                walletBalance: true,
+            },
+            orderBy: { username: 'asc' }
+        });
+        res.json(users);
+    }
+    catch (error) {
+        logger_1.logger.error(error, 'Error fetching users list');
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+exports.getUsersList = getUsersList;

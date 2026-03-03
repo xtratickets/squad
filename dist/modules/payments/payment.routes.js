@@ -32,15 +32,23 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const paymentController = __importStar(require("./payment.controller"));
 const auth_middleware_1 = require("../../middleware/auth.middleware");
 const modeController = __importStar(require("./mode.controller"));
+const multer_1 = __importDefault(require("multer"));
 const router = (0, express_1.Router)();
+const upload = (0, multer_1.default)({ storage: multer_1.default.memoryStorage() });
+router.post('/upload-receipt', auth_middleware_1.authenticate, upload.single('receipt'), paymentController.uploadReceipt);
 router.post('/', auth_middleware_1.authenticate, paymentController.recordPayment);
 router.get('/', auth_middleware_1.authenticate, paymentController.getPayments);
+router.patch('/:id', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)(['STAFF', 'OPERATION', 'ADMIN']), paymentController.editPayment);
 router.get('/modes', auth_middleware_1.authenticate, modeController.getPaymentModes);
 router.post('/modes', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)(['ADMIN']), modeController.createPaymentMode);
 router.patch('/modes/:id', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)(['ADMIN']), modeController.updatePaymentMode);
+router.delete('/modes/:id', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)(['ADMIN']), modeController.deletePaymentMode);
 exports.default = router;

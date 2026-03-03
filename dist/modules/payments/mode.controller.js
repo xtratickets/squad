@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.updatePaymentMode = exports.createPaymentMode = exports.getPaymentModes = void 0;
+exports.deletePaymentMode = exports.updatePaymentMode = exports.createPaymentMode = exports.getPaymentModes = void 0;
 const prisma_service_1 = require("../../services/prisma.service");
 const logger_1 = require("../../utils/logger");
 const getPaymentModes = async (req, res) => {
@@ -44,3 +44,15 @@ const updatePaymentMode = async (req, res) => {
     }
 };
 exports.updatePaymentMode = updatePaymentMode;
+const deletePaymentMode = async (req, res) => {
+    const id = req.params.id;
+    try {
+        await prisma_service_1.prisma.paymentMode.delete({ where: { id } });
+        res.status(204).send();
+    }
+    catch (error) {
+        logger_1.logger.error(error, 'Error deleting payment mode');
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+exports.deletePaymentMode = deletePaymentMode;

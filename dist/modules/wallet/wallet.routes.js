@@ -34,10 +34,9 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
-const salaryController = __importStar(require("./salary.controller"));
+const walletController = __importStar(require("./wallet.controller"));
 const auth_middleware_1 = require("../../middleware/auth.middleware");
 const router = (0, express_1.Router)();
-router.post('/', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)(['OPERATION', 'ADMIN']), salaryController.recordSalary);
-router.get('/', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)(['OPERATION', 'ADMIN']), salaryController.getSalaries);
-router.delete('/:id', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)(['ADMIN']), salaryController.deleteSalary);
+router.get('/:userId', auth_middleware_1.authenticate, walletController.getWallet);
+router.post('/:userId/topup', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)(['ADMIN', 'OPERATION']), walletController.topUpWallet);
 exports.default = router;

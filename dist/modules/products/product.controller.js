@@ -1,8 +1,9 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.updateProduct = exports.addStock = exports.createProduct = exports.getProducts = exports.createCategory = exports.getCategories = void 0;
+exports.deleteCategory = exports.deleteProduct = exports.getStockMovements = exports.updateProduct = exports.addStock = exports.createProduct = exports.getProducts = exports.createCategory = exports.getCategories = void 0;
 const prisma_service_1 = require("../../services/prisma.service");
 const logger_1 = require("../../utils/logger");
+const storage_service_1 = require("../../services/storage.service");
 // Categories
 const getCategories = async (req, res) => {
     try {
@@ -33,11 +34,30 @@ const createCategory = async (req, res) => {
 exports.createCategory = createCategory;
 // Products
 const getProducts = async (req, res) => {
+    const { page, pageSize } = req.query;
     try {
-        const products = await prisma_service_1.prisma.product.findMany({
-            include: { category: true },
+        const pageNum = parseInt(page) || 1;
+        const limit = parseInt(pageSize) || 50;
+        const [products, total] = await Promise.all([
+            prisma_service_1.prisma.product.findMany({
+                include: { category: true },
+                skip: (pageNum - 1) * limit,
+                take: limit,
+                orderBy: { name: 'asc' }
+            }),
+            prisma_service_1.prisma.product.count(),
+        ]);
+        const resProducts = await Promise.all(products.map(async (p) => ({
+            ...p,
+            imageUrl: p.imageUrl ? await storage_service_1.StorageService.getFileUrl(p.imageUrl) : p.imageUrl
+        })));
+        res.json({
+            data: resProducts,
+            total,
+            page: pageNum,
+            pageSize: limit,
+            totalPages: Math.ceil(total / limit),
         });
-        res.json(products);
     }
     catch (error) {
         logger_1.logger.error(error, 'Error fetching products');
@@ -46,12 +66,27 @@ const getProducts = async (req, res) => {
 };
 exports.getProducts = getProducts;
 const createProduct = async (req, res) => {
-    const { name, categoryId, price, cost, stockQty } = req.body;
+    let { name, categoryId, price, cost, stockQty } = req.body;
+    const file = req.file;
     try {
+        let imageUrl;
+        if (file) {
+            imageUrl = await storage_service_1.StorageService.uploadFile(file);
+        }
         const product = await prisma_service_1.prisma.product.create({
-            data: { name, categoryId, price, cost, stockQty },
+            data: {
+                name,
+                categoryId,
+                price: parseFloat(price),
+                cost: parseFloat(cost),
+                stockQty: parseInt(stockQty || '0'),
+                imageUrl,
+            },
         });
-        res.status(201).json(product);
+        res.status(201).json({
+            ...product,
+            imageUrl: product.imageUrl ? await storage_service_1.StorageService.getFileUrl(product.imageUrl) : product.imageUrl
+        });
     }
     catch (error) {
         logger_1.logger.error(error, 'Error creating product');
@@ -88,13 +123,36 @@ const addStock = async (req, res) => {
 exports.addStock = addStock;
 const updateProduct = async (req, res) => {
     const id = req.params.id;
-    const data = req.body;
+    const { name, categoryId, price, cost, stockQty } = req.body;
+    const file = req.file;
     try {
+        const existingProduct = await prisma_service_1.prisma.product.findUnique({ where: { id } });
+        if (!existingProduct)
+            return res.status(404).json({ error: 'Product not found' });
+        let imageUrl = existingProduct.imageUrl;
+        if (file) {
+            // Delete old image if it exists
+            if (imageUrl) {
+                await storage_service_1.StorageService.deleteFile(imageUrl);
+            }
+            imageUrl = await storage_service_1.StorageService.uploadFile(file);
+        }
+        const updateData = {
+            name,
+            categoryId,
+            price: price ? parseFloat(price) : undefined,
+            cost: cost ? parseFloat(cost) : undefined,
+            stockQty: stockQty !== undefined ? parseInt(stockQty) : undefined,
+            imageUrl,
+        };
         const product = await prisma_service_1.prisma.product.update({
             where: { id },
-            data,
+            data: updateData,
         });
-        res.json(product);
+        res.json({
+            ...product,
+            imageUrl: product.imageUrl ? await storage_service_1.StorageService.getFileUrl(product.imageUrl) : product.imageUrl
+        });
     }
     catch (error) {
         logger_1.logger.error(error, 'Error updating product');
@@ -102,3 +160,54 @@ const updateProduct = async (req, res) => {
     }
 };
 exports.updateProduct = updateProduct;
+const getStockMovements = async (req, res) => {
+    try {
+        const page = parseInt(req.query.page) || 1;
+        const pageSize = parseInt(req.query.pageSize) || 50;
+        const [movements, total] = await Promise.all([
+            prisma_service_1.prisma.stockMovement.findMany({
+                include: { product: true },
+                orderBy: { createdAt: 'desc' },
+                skip: (page - 1) * pageSize,
+                take: pageSize,
+            }),
+            prisma_service_1.prisma.stockMovement.count()
+        ]);
+        res.json({
+            data: movements,
+            total,
+            page,
+            pageSize,
+            totalPages: Math.ceil(total / pageSize)
+        });
+    }
+    catch (error) {
+        logger_1.logger.error(error, 'Error fetching stock movements');
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+exports.getStockMovements = getStockMovements;
+const deleteProduct = async (req, res) => {
+    const id = req.params.id;
+    try {
+        await prisma_service_1.prisma.product.delete({ where: { id } });
+        res.status(204).send();
+    }
+    catch (error) {
+        logger_1.logger.error(error, 'Error deleting product');
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+exports.deleteProduct = deleteProduct;
+const deleteCategory = async (req, res) => {
+    const id = req.params.id;
+    try {
+        await prisma_service_1.prisma.category.delete({ where: { id } });
+        res.status(204).send();
+    }
+    catch (error) {
+        logger_1.logger.error(error, 'Error deleting category');
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+exports.deleteCategory = deleteCategory;

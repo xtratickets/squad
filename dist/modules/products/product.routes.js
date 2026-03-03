@@ -32,17 +32,25 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const productController = __importStar(require("./product.controller"));
 const auth_middleware_1 = require("../../middleware/auth.middleware");
+const multer_1 = __importDefault(require("multer"));
 const router = (0, express_1.Router)();
+const upload = (0, multer_1.default)({ storage: multer_1.default.memoryStorage() });
 // Categories
 router.get('/categories', auth_middleware_1.authenticate, productController.getCategories);
 router.post('/categories', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)(['ADMIN']), productController.createCategory);
+router.delete('/categories/:id', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)(['ADMIN']), productController.deleteCategory);
 // Products
 router.get('/', auth_middleware_1.authenticate, productController.getProducts);
-router.post('/', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)(['ADMIN', 'OPERATION']), productController.createProduct);
-router.patch('/:id', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)(['ADMIN', 'OPERATION']), productController.updateProduct);
+router.post('/', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)(['ADMIN', 'OPERATION']), upload.single('image'), productController.createProduct);
+router.patch('/:id', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)(['ADMIN', 'OPERATION']), upload.single('image'), productController.updateProduct);
+router.delete('/:id', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)(['ADMIN', 'OPERATION']), productController.deleteProduct);
 router.post('/:id/stock', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)(['ADMIN', 'OPERATION']), productController.addStock);
+router.get('/stock-movements', auth_middleware_1.authenticate, productController.getStockMovements);
 exports.default = router;

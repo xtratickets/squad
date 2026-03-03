@@ -34,10 +34,10 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
-const salaryController = __importStar(require("./salary.controller"));
+const ownerController = __importStar(require("./owner.controller"));
 const auth_middleware_1 = require("../../middleware/auth.middleware");
 const router = (0, express_1.Router)();
-router.post('/', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)(['OPERATION', 'ADMIN']), salaryController.recordSalary);
-router.get('/', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)(['OPERATION', 'ADMIN']), salaryController.getSalaries);
-router.delete('/:id', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)(['ADMIN']), salaryController.deleteSalary);
+router.get('/', auth_middleware_1.authenticate, ownerController.getOwners);
+router.get('/dashboard', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)(['OWNER', 'ADMIN']), ownerController.getOwnerDashboard);
+router.post('/:id/pay', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)(['STAFF', 'OPERATION', 'ADMIN']), ownerController.payOwner);
 exports.default = router;

@@ -73,6 +73,7 @@
       "dist/**/*",
       "public/**/*",
       "prisma/**/*",
+      "frontend/dist/**/*",
       "package.json"
     ],
     "win": {

@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getExpenses = exports.createExpense = void 0;
+exports.deleteExpense = exports.getExpenses = exports.createExpense = void 0;
 const prisma_service_1 = require("../../services/prisma.service");
 const logger_1 = require("../../utils/logger");
 const createExpense = async (req, res) => {
@@ -49,3 +49,15 @@ const getExpenses = async (req, res) => {
     }
 };
 exports.getExpenses = getExpenses;
+const deleteExpense = async (req, res) => {
+    const id = req.params.id;
+    try {
+        await prisma_service_1.prisma.expense.delete({ where: { id } });
+        res.status(204).send();
+    }
+    catch (error) {
+        logger_1.logger.error(error, 'Error deleting expense');
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+exports.deleteExpense = deleteExpense;

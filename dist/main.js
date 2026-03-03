@@ -49,8 +49,14 @@ function createWindow() {
         },
         title: "SQUAD POS",
     });
-    // In production, we'd load a file. In development, we can load the local dev server or index.html
-    mainWindow.loadFile(path.join(__dirname, '../public/index.html'));
+    const isDev = process.env.NODE_ENV !== 'production';
+    if (isDev) {
+        mainWindow.loadURL('http://localhost:5173');
+        mainWindow.webContents.openDevTools();
+    }
+    else {
+        mainWindow.loadFile(path.join(__dirname, '../frontend/dist/index.html'));
+    }
     mainWindow.on('closed', () => {
         mainWindow = null;
     });
@@ -68,6 +74,23 @@ function startBackend() {
         console.error('Backend error:', err);
     });
 }
+// IPC Handlers
+electron_1.ipcMain.on('print-receipt', (event, content) => {
+    let workerWindow = new electron_1.BrowserWindow({
+        show: false,
+        webPreferences: {
+            nodeIntegration: true,
+            contextIsolation: false
+        }
+    });
+    workerWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(content)}`);
+    workerWindow.webContents.on('did-finish-load', () => {
+        workerWindow?.webContents.print({ silent: true, printBackground: true }, (success, failureReason) => {
+            console.log('Print result:', success, failureReason);
+            workerWindow = null;
+        });
+    });
+});
 electron_1.app.on('ready', () => {
     startBackend();
     createWindow();

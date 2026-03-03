@@ -14,6 +14,7 @@ class BillingService {
                     },
                     where: {
                         status: 'approved',
+                        type: { not: 'owner' },
                     },
                 },
             },
@@ -21,13 +22,17 @@ class BillingService {
         if (!session)
             throw new Error('Session not found');
         const durationMs = endTime.getTime() - session.startTime.getTime();
-        const durationMinutes = Math.ceil(durationMs / 60000);
-        // Minimum minutes logic
-        const billableMinutes = Math.max(durationMinutes, session.room.minMinutes);
+        // Subtract paused duration in milliseconds for maximum precision
+        let totalPausedMs = session.totalPausedMs || 0;
+        if (session.isPaused && session.lastPausedAt) {
+            totalPausedMs += endTime.getTime() - new Date(session.lastPausedAt).getTime();
+        }
+        const billableMs = Math.max(0, durationMs - totalPausedMs);
+        const billableMinutes = Math.max(Math.ceil(billableMs / 60000), session.room.minMinutes);
         // Room amount
         const roomAmount = (billableMinutes / 60) * session.room.pricePerHour;
-        // Orders total
-        const ordersAmount = session.orders.reduce((sum, order) => sum + (order.orderCharge?.finalTotal || 0), 0);
+        // Orders total (pre-tax/fee portion to avoid double taxing when session taxes it again)
+        const ordersAmount = session.orders.reduce((sum, order) => sum + ((order.orderCharge?.itemsTotal || 0) - (order.orderCharge?.discount || 0)), 0);
         // Get group fee config
         const feeConfig = await prisma_service_1.prisma.feeConfig.findUnique({
             where: { id: 'default' },
@@ -38,6 +43,7 @@ class BillingService {
         const serviceFee = (discountedSubtotal * (feeConfig?.serviceFeePercent || 0)) / 100;
         const tax = (discountedSubtotal * (feeConfig?.taxPercent || 0)) / 100;
         const finalTotal = discountedSubtotal + serviceFee + tax + tip;
+        const durationMinutes = Math.ceil(billableMs / 60000);
         return {
             durationMinutes,
             billableMinutes,
@@ -59,16 +65,6 @@ class BillingService {
             where: { orderId },
         });
         const itemsTotal = orderItems.reduce((sum, item) => sum + item.total, 0);
-        if (order?.type === 'owner') {
-            return {
-                itemsTotal,
-                discount: itemsTotal,
-                serviceFee: 0,
-                tax: 0,
-                tip: 0,
-                finalTotal: 0,
-            };
-        }
         const feeConfig = await prisma_service_1.prisma.feeConfig.findUnique({
             where: { id: 'default' },
         });

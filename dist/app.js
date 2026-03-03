@@ -4,6 +4,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
+const path_1 = __importDefault(require("path"));
+const fs_1 = __importDefault(require("fs"));
 const cors_1 = __importDefault(require("cors"));
 const logger_1 = require("./utils/logger");
 const system_routes_1 = __importDefault(require("./modules/system/system.routes"));
@@ -22,8 +24,22 @@ const report_routes_1 = __importDefault(require("./modules/reports/report.routes
 const promocode_routes_1 = __importDefault(require("./modules/promocodes/promocode.routes"));
 const salary_routes_1 = __importDefault(require("./modules/salaries/salary.routes"));
 const guest_routes_1 = __importDefault(require("./modules/guest/guest.routes"));
+const wallet_routes_1 = __importDefault(require("./modules/wallet/wallet.routes"));
+const owner_routes_1 = __importDefault(require("./modules/owners/owner.routes"));
 const error_middleware_1 = require("./middleware/error.middleware");
 const app = (0, express_1.default)();
+console.log('--- APP.TS LOADING ---');
+logger_1.logger.info('--- APP.TS INITIALIZING ---');
+app.get('/ping', (req, res) => {
+    res.json({ pong: true, time: new Date().toISOString(), env: process.env.NODE_ENV });
+});
+app.get('/env-config.js', (req, res) => {
+    res.type('application/javascript');
+    const env = {
+        VITE_API_URL: process.env.VITE_API_URL || '',
+    };
+    res.send(`window.ENV = ${JSON.stringify(env)};`);
+});
 // Middleware
 app.use((0, cors_1.default)());
 app.use(express_1.default.json());
@@ -49,10 +65,43 @@ app.use('/api/reservations', reservation_routes_1.default);
 app.use('/api/reports', report_routes_1.default);
 app.use('/api/promocodes', promocode_routes_1.default);
 app.use('/api/salaries', salary_routes_1.default);
+app.use('/api/wallet', wallet_routes_1.default);
+app.use('/api/owners', owner_routes_1.default);
 // Health check
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
+// Resolve frontend static path — tries multiple depths to handle different tsconfig outDir configs
+const candidatePaths = [
+    path_1.default.join(__dirname, '../frontend/dist'), // if outDir = ./dist
+    path_1.default.join(__dirname, '../../frontend/dist'), // if outDir = ./dist/src
+];
+const staticPath = candidatePaths.find(p => fs_1.default.existsSync(path_1.default.join(p, 'index.html'))) ?? candidatePaths[0];
+const indexHtmlPath = path_1.default.join(staticPath, 'index.html');
+const indexExists = fs_1.default.existsSync(indexHtmlPath);
+console.log('--- Static Serving Debug ---');
+logger_1.logger.info({
+    nodeEnv: process.env.NODE_ENV,
+    __dirname,
+    staticPath,
+    indexExists,
+    cwd: process.cwd(),
+    candidatePaths,
+}, 'Static serving debug info');
+if (indexExists) {
+    logger_1.logger.info({ staticPath }, 'Serving frontend static files');
+    app.use(express_1.default.static(staticPath));
+    app.get('*', (req, res) => {
+        if (req.url.startsWith('/api')) {
+            logger_1.logger.warn({ method: req.method, url: req.url }, 'API route not found (falling to catch-all)');
+            return res.status(404).json({ error: `API route not found: ${req.method} ${req.url}` });
+        }
+        res.sendFile(indexHtmlPath);
+    });
+}
+else {
+    logger_1.logger.warn({ staticPath, candidatePaths }, 'Frontend build (index.html) not found. Serving API only.');
+}
 // Error handling
 app.use(error_middleware_1.errorHandler);
 exports.default = app;

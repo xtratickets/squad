@@ -39,5 +39,7 @@ const auth_middleware_1 = require("../../middleware/auth.middleware");
 const router = (0, express_1.Router)();
 router.get('/', auth_middleware_1.authenticate, promoController.getPromoCodes);
 router.post('/', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)(['ADMIN']), promoController.createPromoCode);
+router.patch('/:id', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)(['ADMIN']), promoController.updatePromoCode);
 router.get('/:code', auth_middleware_1.authenticate, promoController.validatePromoCode);
+router.delete('/:id', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)(['ADMIN']), promoController.deletePromoCode);
 exports.default = router;

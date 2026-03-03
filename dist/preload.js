@@ -7,4 +7,5 @@ electron_1.contextBridge.exposeInMainWorld('electronAPI', {
     on: (channel, func) => {
         electron_1.ipcRenderer.on(channel, (event, ...args) => func(...args));
     },
+    printReceipt: (content) => electron_1.ipcRenderer.send('print-receipt', content),
 });

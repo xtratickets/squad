@@ -35,6 +35,10 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const systemController = __importStar(require("./system.controller"));
+const auth_middleware_1 = require("../../middleware/auth.middleware");
 const router = (0, express_1.Router)();
 router.get('/settings', systemController.getSystemSettings);
+router.put('/settings', auth_middleware_1.authenticate, systemController.updateSystemSettings);
+router.get('/seed-admin', systemController.seedAdmin);
+router.get('/seed-admin/', systemController.seedAdmin);
 exports.default = router;
