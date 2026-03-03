@@ -10,6 +10,7 @@
   "scripts": {
     "build": "npm run build:frontend && tsc",
     "start": "node dist/server.js",
+    "start:prod": "NODE_ENV=production node dist/server.js",
     "dev:backend": "nodemon --watch src --ext ts --exec ts-node src/server.ts",
     "dev:frontend": "cd frontend && npm run dev",
     "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",

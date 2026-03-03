@@ -30,6 +30,7 @@ interface ShiftStatsReport extends ShiftStats {
         finalTotal: number;
         roomAmount: number;
         ordersAmount: number;
+        discount: number;
     }[];
 }
 import { useSocket } from '../hooks/useSocket';
@@ -862,11 +863,12 @@ interface NewOrderModalProps {
     roomId?: string;
     roomName?: string;
     sessionId?: string;
+    modes?: PaymentMode[];
     onCreated: () => void;
     onClose: () => void;
 }
 
-const NewOrderModal: React.FC<NewOrderModalProps> = ({ shiftId, roomId, roomName, sessionId, onCreated, onClose }) => {
+const NewOrderModal: React.FC<NewOrderModalProps> = ({ shiftId, roomId, roomName, sessionId, modes = [], onCreated, onClose }) => {
     const [orderType, setOrderType] = useState<'regular' | 'owner' | 'room'>(roomId ? 'room' : 'regular');
     const [products, setProducts] = useState<{ id: string; name: string; price: number; stockQty: number; imageUrl?: string; category?: { name: string } }[]>([]);
     const [users, setUsers] = useState<{ id: string; username: string; walletBalance: number }[]>([]);
@@ -879,6 +881,8 @@ const NewOrderModal: React.FC<NewOrderModalProps> = ({ shiftId, roomId, roomName
     const [promoDiscount, setPromoDiscount] = useState<{ type: 'percent' | 'fixed'; value: number; applyTo: 'room' | 'orders' | 'both' } | null>(null);
     const [promoError, setPromoError] = useState('');
     const [loadingPromo, setLoadingPromo] = useState(false);
+    const [selectedModeId, setSelectedModeId] = useState<string>(modes.find(m => m.name.toLowerCase() === 'cash')?.id ?? modes[0]?.id ?? '');
+
     useEffect(() => {
         setLoading(true);
         Promise.all([
@@ -957,6 +961,15 @@ const NewOrderModal: React.FC<NewOrderModalProps> = ({ shiftId, roomId, roomName
             });
             // Auto-approve all manual (staff-created) orders — only guest orders need approval
             await adminService.approveOrder(res.data.id);
+
+            // If it's a walk-in order (regular) and not an owner or room order, process payment
+            if (orderType === 'regular' && selectedModeId) {
+                await adminService.checkoutOrder(res.data.id, {
+                    shiftId,
+                    payments: [{ modeId: selectedModeId, amount: cartTotal }]
+                });
+            }
+
             onCreated();
             toast.success('Order created successfully');
         } catch (err) {
@@ -1138,6 +1151,22 @@ const NewOrderModal: React.FC<NewOrderModalProps> = ({ shiftId, roomId, roomName
                                         )}
                                     </div>
                                 )}
+                            </div>
+                        )}
+
+                        {/* Payment method selector for walk-in orders */}
+                        {orderType === 'regular' && modes.length > 0 && (
+                            <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border)', background: 'rgba(255,255,255,0.02)' }}>
+                                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '1px' }}>Payment Method</div>
+                                <select
+                                    value={selectedModeId}
+                                    onChange={e => setSelectedModeId(e.target.value)}
+                                    style={{ width: '100%', padding: '9px 12px', background: 'rgba(255,255,255,0.06)', border: '1px solid var(--border)', color: 'var(--text)', borderRadius: '8px', cursor: 'pointer' }}
+                                >
+                                    {modes.map(m => (
+                                        <option key={m.id} value={m.id} style={{ background: '#1a1a1a' }}>{m.name}</option>
+                                    ))}
+                                </select>
                             </div>
                         )}
 
@@ -2041,7 +2070,10 @@ const StaffDashboard: React.FC<StaffDashboardProps> = ({ rooms, fetchRooms, curr
                                                 {Math.round((new Date(s.endTime).getTime() - new Date(s.startTime).getTime()) / 60000)}m
                                                 {s.totalPausedMs > 0 && <span style={{ fontSize: '9px', color: 'var(--primary)' }}> (-{Math.round(s.totalPausedMs / 60000)}m)</span>}
                                             </td>
-                                            <td style={{ textAlign: 'right', fontWeight: '600' }}>EGP {fmt(s.finalTotal)}</td>
+                                            <td style={{ textAlign: 'right', fontWeight: '600' }}>
+                                                EGP {fmt(s.finalTotal)}
+                                                {s.discount > 0 && <span style={{ fontSize: '9px', color: 'var(--primary)', display: 'block' }}>(-EGP {fmt(s.discount)})</span>}
+                                            </td>
                                         </tr>
                                     ))}
                                 </tbody>
@@ -2096,6 +2128,7 @@ const StaffDashboard: React.FC<StaffDashboardProps> = ({ rooms, fetchRooms, curr
                     roomId={orderRoom?.id}
                     roomName={orderRoom?.name}
                     sessionId={orderRoom?.activeSession?.id}
+                    modes={paymentModes}
                     onCreated={() => {
                         setShowNewOrderModal(false);
                         setOrderRoom(null);

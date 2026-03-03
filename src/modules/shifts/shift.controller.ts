@@ -63,14 +63,6 @@ export const closeShift = async (req: any, res: Response) => {
     const { cashPhysical } = req.body;
 
     try {
-        const activeSessions = await prisma.session.findFirst({
-            where: { openedShiftId: id, status: 'active' },
-        });
-
-        if (activeSessions) {
-            return res.status(400).json({ error: 'Cannot close shift with active sessions' });
-        }
-
         const shift = await prisma.$transaction(async (tx) => {
             const s = await tx.shift.update({
                 where: { id },
@@ -146,9 +138,11 @@ export const getShiftStats = async (req: Request, res: Response) => {
                 startTime: s.startTime,
                 endTime: s.endTime,
                 totalPausedMinutes: (s as any).totalPausedMinutes || 0,
+                totalPausedMs: (s as any).totalPausedMs || 0,
                 finalTotal: s.sessionCharge?.finalTotal || 0,
                 roomAmount: s.sessionCharge?.roomAmount || 0,
                 ordersAmount: s.sessionCharge?.ordersAmount || 0,
+                discount: s.sessionCharge?.discount || 0,
             }))
         });
     } catch (error) {
@@ -331,6 +325,7 @@ export const getAllShifts = async (req: Request, res: Response) => {
                     openedSessions: {
                         include: {
                             room: { select: { id: true, name: true } },
+                            sessionCharge: true,
                         },
                     },
                     payments: { include: { mode: true } },

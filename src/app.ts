@@ -1,4 +1,5 @@
 import express from 'express';
+import path from 'path';
 import cors from 'cors';
 import { logger } from './utils/logger';
 import systemRoutes from './modules/system/system.routes';
@@ -57,6 +58,17 @@ app.use('/api/owners', ownerRoutes);
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
+
+// Serve static assets in production
+if (process.env.NODE_ENV === 'production') {
+    app.use(express.static(path.join(__dirname, '../frontend/dist')));
+
+    app.get('*', (req, res) => {
+        // Skip API routes
+        if (req.url.startsWith('/api')) return res.status(404).json({ error: 'Not found' });
+        res.sendFile(path.join(__dirname, '../frontend/dist/index.html'));
+    });
+}
 
 // Error handling
 app.use(errorHandler);

@@ -103,10 +103,15 @@ export const endSession = async (req: any, res: Response) => {
             const promo = await prisma.promoCode.findUnique({ where: { code: promoCode } });
             if (promo && promo.active && (promo.usageLimit ?? 0) > 0 && (!promo.expiry || promo.expiry > new Date())) {
                 const durationMs = endTime.getTime() - session.startTime.getTime();
-                const durationMinutes = Math.ceil(durationMs / 60000);
-                const billableMinutes = Math.max(durationMinutes, session.room.minMinutes);
+                const totalPausedMs = (session as any).totalPausedMs || 0;
+                const billableMs = Math.max(0, durationMs - totalPausedMs);
+                const billableMinutes = Math.max(Math.ceil(billableMs / 60000), session.room.minMinutes);
+
                 const roomAmount = (billableMinutes / 60) * session.room.pricePerHour;
-                const ordersAmount = session.orders.reduce((sum, order) => sum + (order.orderCharge?.finalTotal || 0), 0);
+                const ordersAmount = session.orders.reduce((sum, order) => {
+                    const oc = order.orderCharge;
+                    return sum + ((oc?.itemsTotal || 0) - (oc?.discount || 0));
+                }, 0);
 
                 // Determine base for discount based on applyTo
                 const applyTo = (promo as any).applyTo ?? 'both';
@@ -144,7 +149,8 @@ export const endSession = async (req: any, res: Response) => {
                 where: { shiftId: closedShiftId },
                 data: {
                     sessionsRevenue: { increment: charges.roomAmount },
-                    totalRevenue: { increment: charges.roomAmount - charges.discount },
+                    ordersRevenue: { increment: charges.ordersAmount },
+                    totalRevenue: { increment: (charges.finalTotal - charges.tip) },
                     tipsTotal: { increment: charges.tip },
                 },
             });

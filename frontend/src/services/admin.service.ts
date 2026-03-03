@@ -149,6 +149,7 @@ export const adminService = {
     },
     createOrder: (data: CreateOrderData) => api.post<OrderSummary>('/orders', data),
     approveOrder: (id: string) => api.post<OrderSummary>(`/orders/${id}/approve`, {}),
+    checkoutOrder: (id: string, data: { payments: { modeId: string; amount: number }[]; shiftId: string }) => api.post(`/orders/${id}/checkout`, data),
     cancelOrder: (id: string) => api.patch<OrderSummary>(`/orders/${id}`, { status: 'cancelled' }),
 
     // Staff-accessible users list (for owner selector in orders)

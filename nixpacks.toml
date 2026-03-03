@@ -1,0 +1,11 @@
+[phases.setup]
+nixPkgs = ["nodejs", "openssl"]
+
+[phases.install]
+cmds = ["npm install", "cd frontend && npm install"]
+
+[phases.build]
+cmds = ["npm run build:frontend", "npx prisma generate", "npx tsc"]
+
+[start]
+cmd = "npx prisma migrate deploy && node dist/server.js"
