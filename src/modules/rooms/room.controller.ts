@@ -22,11 +22,13 @@ export const listRooms = async (req: Request, res: Response) => {
             orderBy: { name: 'asc' },
         });
         // Flatten activeSession for convenience
-        const result = rooms.map(r => ({
-            ...r,
-            activeSession: r.sessions[0] ?? null,
-            sessions: undefined,
-        }));
+        const result = rooms.map((r: any) => {
+            const { sessions, ...rest } = r;
+            return {
+                ...rest,
+                activeSession: sessions[0] ?? null,
+            };
+        });
         res.json(result);
     } catch (error) {
         logger.error(error, 'Error listing rooms');

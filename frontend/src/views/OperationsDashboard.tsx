@@ -161,6 +161,20 @@ const SessionsTab: React.FC = () => {
                         { header: 'Status', key: 'status', render: (s: any) => <span style={{ color: s.status === 'active' ? 'var(--primary)' : 'var(--text-muted)', fontWeight: 600 }}>{s.status}</span> },
                         { header: 'Start', key: 'startTime', render: (s: any) => <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{new Date(s.startTime).toLocaleString()}</span> },
                         { header: 'End', key: 'endTime', render: (s: any) => s.endTime ? <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{new Date(s.endTime).toLocaleString()}</span> : <span style={{ color: 'var(--primary)', fontSize: '12px' }}>Active</span> },
+                        {
+                            header: 'Total',
+                            key: 'total',
+                            render: (s: any) => s.sessionCharge ? (
+                                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                    <span style={{ fontWeight: 600 }}>EGP {s.sessionCharge.finalTotal?.toFixed(2)}</span>
+                                    {s.sessionCharge.discount > 0 && (
+                                        <span style={{ fontSize: '10px', color: '#f87171', fontWeight: 700 }}>
+                                            -EGP {s.sessionCharge.discount?.toFixed(2)} (Disc)
+                                        </span>
+                                    )}
+                                </div>
+                            ) : <span style={{ color: 'var(--text-muted)' }}>—</span>
+                        },
                         { header: 'Payments', key: 'payments', render: (s: any) => <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>{(s.payments ?? []).length} paid</span> },
                     ]}
                     actions={(s: any) => (

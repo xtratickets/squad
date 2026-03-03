@@ -363,7 +363,7 @@ const ShiftHistoryView: React.FC<ShiftHistoryViewProps> = ({ user }) => {
                                                                         <div style={{ textAlign: 'right' }}>
                                                                             {(s.sessionCharge as any)?.discount > 0 && (
                                                                                 <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px' }}>
-                                                                                    After Disc: {formatCurrency((s.sessionCharge as any).itemsTotal - (s.sessionCharge as any).discount)}
+                                                                                    After Disc: {formatCurrency(((s.sessionCharge as any).itemsTotal || (s.sessionCharge as any).roomAmount + (s.sessionCharge as any).ordersAmount) - (s.sessionCharge as any).discount)}
                                                                                 </div>
                                                                             )}
                                                                             <div style={{ fontSize: '13px', fontWeight: 'bold', color: 'var(--primary)' }}>
@@ -508,45 +508,68 @@ const ShiftHistoryView: React.FC<ShiftHistoryViewProps> = ({ user }) => {
                         </div>
 
                         {/* Charge Breakdown — shows when discount, tip, or promo code is present */}
-                        {viewSession.sessionCharge && ((viewSession.sessionCharge as any).discount > 0 || (viewSession.sessionCharge as any).tip > 0 || (viewSession.sessionCharge as any).promoCode) && (
-                            <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', borderRadius: '10px', padding: '14px', marginBottom: '20px', fontSize: '14px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold', marginBottom: '4px' }}>Charge Breakdown</div>
-                                {(viewSession.sessionCharge as any).promoCode && (
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                        <span style={{ color: 'var(--text-muted)' }}>Promo Code</span>
-                                        <span style={{ background: 'rgba(139,92,246,0.15)', color: '#a78bfa', fontSize: '11px', padding: '2px 10px', borderRadius: '8px', fontWeight: 700 }}>
-                                            {(viewSession.sessionCharge as any).promoCode}
-                                        </span>
-                                    </div>
-                                )}
-                                {(viewSession.sessionCharge as any).itemsTotal !== undefined && (
+                        {viewSession.sessionCharge && (
+                            (viewSession.sessionCharge as any).discount > 0 ||
+                            (viewSession.sessionCharge as any).tip > 0 ||
+                            (viewSession.sessionCharge as any).promoCode ||
+                            ((viewSession.sessionCharge as any).serviceFee || 0) > 0 ||
+                            ((viewSession.sessionCharge as any).tax || 0) > 0
+                        ) && (
+                                <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', borderRadius: '10px', padding: '14px', marginBottom: '20px', fontSize: '14px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold', marginBottom: '4px' }}>Charge Breakdown</div>
+
                                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                        <span style={{ color: 'var(--text-muted)' }}>Subtotal (After Disc)</span>
-                                        <span>{formatCurrency((viewSession.sessionCharge as any).itemsTotal - ((viewSession.sessionCharge as any).discount || 0))}</span>
+                                        <span style={{ color: 'var(--text-muted)' }}>Subtotal (Room + Orders)</span>
+                                        <span>{formatCurrency(((viewSession.sessionCharge as any).roomAmount || 0) + ((viewSession.sessionCharge as any).ordersAmount || 0))}</span>
                                     </div>
-                                )}
-                                {(viewSession.sessionCharge as any).discount > 0 && (
-                                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                        <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                            <span style={{ background: 'rgba(239,68,68,0.15)', color: '#f87171', fontSize: '11px', padding: '1px 8px', borderRadius: '8px', fontWeight: 700 }}>DISCOUNT</span>
-                                        </span>
-                                        <span style={{ color: '#f87171', fontWeight: 600 }}>-{formatCurrency((viewSession.sessionCharge as any).discount)}</span>
+
+                                    {(viewSession.sessionCharge as any).promoCode && (
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                            <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>Promo Code</span>
+                                            <span style={{ background: 'rgba(139,92,246,0.15)', color: '#a78bfa', fontSize: '11px', padding: '2px 10px', borderRadius: '8px', fontWeight: 700 }}>
+                                                {(viewSession.sessionCharge as any).promoCode}
+                                            </span>
+                                        </div>
+                                    )}
+
+                                    {((viewSession.sessionCharge as any).discount > 0 || (viewSession.sessionCharge as any).promoCode) && (
+                                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                            <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                <span style={{ background: 'rgba(239,68,68,0.15)', color: '#f87171', fontSize: '11px', padding: '1px 8px', borderRadius: '8px', fontWeight: 700 }}>DISCOUNT</span>
+                                            </span>
+                                            <span style={{ color: '#f87171', fontWeight: 600 }}>-{formatCurrency((viewSession.sessionCharge as any).discount || 0)}</span>
+                                        </div>
+                                    )}
+
+                                    {((viewSession.sessionCharge as any).serviceFee || 0) > 0 && (
+                                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                            <span style={{ color: 'var(--text-muted)' }}>Service Fee</span>
+                                            <span>{formatCurrency((viewSession.sessionCharge as any).serviceFee)}</span>
+                                        </div>
+                                    )}
+
+                                    {((viewSession.sessionCharge as any).tax || 0) > 0 && (
+                                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                            <span style={{ color: 'var(--text-muted)' }}>Tax</span>
+                                            <span>{formatCurrency((viewSession.sessionCharge as any).tax)}</span>
+                                        </div>
+                                    )}
+
+                                    {(viewSession.sessionCharge as any).tip > 0 && (
+                                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                            <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                <span style={{ background: 'rgba(0,230,118,0.12)', color: 'var(--primary)', fontSize: '11px', padding: '1px 8px', borderRadius: '8px', fontWeight: 700 }}>TIP</span>
+                                            </span>
+                                            <span style={{ color: 'var(--primary)', fontWeight: 600 }}>+{formatCurrency((viewSession.sessionCharge as any).tip)}</span>
+                                        </div>
+                                    )}
+
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--border)', paddingTop: '8px', fontWeight: 700 }}>
+                                        <span>Final Total</span>
+                                        <span style={{ color: 'var(--primary)' }}>{formatCurrency(viewSession.sessionCharge?.finalTotal)}</span>
                                     </div>
-                                )}
-                                {(viewSession.sessionCharge as any).tip > 0 && (
-                                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                        <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                            <span style={{ background: 'rgba(0,230,118,0.12)', color: 'var(--primary)', fontSize: '11px', padding: '1px 8px', borderRadius: '8px', fontWeight: 700 }}>TIP</span>
-                                        </span>
-                                        <span style={{ color: 'var(--primary)', fontWeight: 600 }}>+{formatCurrency((viewSession.sessionCharge as any).tip)}</span>
-                                    </div>
-                                )}
-                                <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--border)', paddingTop: '8px', fontWeight: 700 }}>
-                                    <span>Final Total</span>
-                                    <span style={{ color: 'var(--primary)' }}>{formatCurrency(viewSession.sessionCharge?.finalTotal)}</span>
                                 </div>
-                            </div>
-                        )}
+                            )}
 
                         {viewSession.payments && viewSession.payments.length > 0 && (
                             <PaymentsEditor payments={viewSession.payments} onUpdated={() => {
