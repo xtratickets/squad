@@ -19,6 +19,7 @@
     "electron": "electron .",
     "dev:electron": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\" \"wait-on http://localhost:5173 && tsc && electron .\"",
     "build:frontend": "cd frontend && npm run build",
+    "ci:frontend": "cd frontend && npm ci",
     "dist": "npm run build && electron-builder",
     "test": "jest"
   },

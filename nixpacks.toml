@@ -2,7 +2,7 @@
 nixPkgs = ["nodejs", "openssl"]
 
 [phases.install]
-cmds = ["npm install", "cd frontend && npm install"]
+cmds = ["npm ci", "npm run ci:frontend"]
 
 [phases.build]
 cmds = ["npm run build:frontend", "npx prisma generate", "rm -rf dist && npx tsc"]
