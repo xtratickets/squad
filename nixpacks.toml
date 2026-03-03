@@ -13,7 +13,7 @@ cmds = [
 
 [phases.build]
 # Install full dependencies (including dev) for building
-# Run Prisma generate, then build backend & frontend
+# Run Prisma generate (automatic with npm install), then build backend & frontend
 cmds = [
   "npm install --prefer-offline --no-audit 2>&1 | grep -v 'npm warn' || true",
   "cd frontend && npm install --prefer-offline --no-audit 2>&1 | grep -v 'npm warn' || true",
