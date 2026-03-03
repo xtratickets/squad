@@ -24,7 +24,6 @@ const initSocket = (server) => {
             logger_1.logger.info({ socketId: socket.id }, 'Client disconnected');
         });
     });
-    // Broadcast room states periodically to all clients to replace HTTP polling
     if (!stateBroadcastInterval) {
         stateBroadcastInterval = setInterval(async () => {
             try {
@@ -80,7 +79,6 @@ exports.emitToRoom = emitToRoom;
 const broadcast = (event, data) => {
     if (io) {
         io.emit(event, data);
-        // Reduce log noise for periodic state broadcasts
         if (event !== 'rooms.states_update') {
             logger_1.logger.debug({ event }, 'Global event broadcasted');
         }

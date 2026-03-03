@@ -37,14 +37,12 @@ const startSession = async (req, res) => {
     const { roomId, openedShiftId } = req.body;
     const openedById = req.user.userId;
     try {
-        // Check if room is already occupied
         const activeSession = await prisma_service_1.prisma.session.findFirst({
             where: { roomId, status: 'active' },
         });
         if (activeSession) {
             return res.status(400).json({ error: 'Room is already occupied' });
         }
-        // Start session and update room status in a transaction
         const session = await prisma_service_1.prisma.$transaction(async (tx) => {
             const s = await tx.session.create({
                 data: {
@@ -60,7 +58,6 @@ const startSession = async (req, res) => {
             });
             return s;
         });
-        // Realtime & Audit
         (0, socket_1.broadcast)('room.state_updated', { roomId, status: 'occupied' });
         (0, socket_1.broadcast)('session.started', session);
         await audit_service_1.AuditService.log('Session', session.id, 'START', openedById, null, session);
@@ -106,16 +103,15 @@ const endSession = async (req, res) => {
                     const oc = order.orderCharge;
                     return sum + ((oc?.itemsTotal || 0) - (oc?.discount || 0));
                 }, 0);
-                // Determine base for discount based on applyTo
                 const applyTo = promo.applyTo ?? 'both';
                 const base = applyTo === 'room' ? roomAmount :
                     applyTo === 'orders' ? ordersAmount :
-                        roomAmount + ordersAmount; // 'both'
+                        roomAmount + ordersAmount;
                 if (promo.type === 'percent') {
                     discountAmount = (base * promo.value) / 100;
                 }
                 else {
-                    discountAmount = Math.min(promo.value, base); // fixed — cap at base
+                    discountAmount = Math.min(promo.value, base);
                 }
             }
         }
@@ -141,10 +137,6 @@ const endSession = async (req, res) => {
                     tipsTotal: { increment: charges.tip },
                 },
             });
-            // ── Owner Wallet Deduction ─────────────────────────────────────
-            // If an owner-type order exists for this session, deduct the full
-            // session room amount from the owner's wallet (allows negative balance
-            // for post-paid / credit tab scenarios).
             const ownerOrder = session.orders.find(o => o.type === 'owner' && o.ownerUserId);
             if (ownerOrder?.ownerUserId) {
                 const deductAmount = charges.finalTotal;
@@ -161,7 +153,6 @@ const endSession = async (req, res) => {
                             shiftId: closedShiftId,
                         },
                     });
-                    // Record as a payment to match revenue in ShiftStats
                     await tx.payment.create({
                         data: {
                             modeId: 'WALLET',
@@ -171,12 +162,10 @@ const endSession = async (req, res) => {
                             shiftId: closedShiftId,
                         }
                     });
-                    // Track wallet payment in stats
                     await tx.shiftStats.update({
                         where: { shiftId: closedShiftId },
                         data: { paymentsWallet: { increment: deductAmount } },
                     });
-                    // Approve the owner order to mark it as settled
                     await tx.order.update({
                         where: { id: ownerOrder.id },
                         data: { status: 'approved' },
@@ -194,7 +183,6 @@ const endSession = async (req, res) => {
             }
             return s;
         });
-        // Realtime, Audit & Receipt
         (0, socket_1.broadcast)('room.state_updated', { roomId: session.roomId, status: 'available' });
         (0, socket_1.broadcast)('session.ended', { sessionId: id, charges });
         await audit_service_1.AuditService.log('Session', id, 'END', closedById, session, closedSession);
@@ -295,11 +283,6 @@ const updateSession = async (req, res) => {
     }
 };
 exports.updateSession = updateSession;
-/**
- * POST /api/sessions/:id/checkout
- * Body: { payments: [{ modeId: string, amount: number }], shiftId: string }
- * Records multiple payments for a session (split payment support).
- */
 const checkoutSession = async (req, res) => {
     const id = req.params.id;
     const { payments, shiftId } = req.body;
@@ -340,7 +323,7 @@ const checkoutSession = async (req, res) => {
                 else if (modeName === 'WALLET')
                     updateData.paymentsWallet = { increment: amount };
                 else
-                    updateData.paymentsCard = { increment: amount }; // INSTAPAY, CARD, etc.
+                    updateData.paymentsCard = { increment: amount };
                 if (Object.keys(updateData).length > 0) {
                     await tx.shiftStats.update({
                         where: { shiftId: resolvedShiftId },

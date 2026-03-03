@@ -14,7 +14,7 @@ const getSystemSettings = (req, res) => {
     res.json({
         systemName: config_1.config.systemName,
         systemLogo: config_1.config.systemLogo,
-        version: '1.0.0', // Could be from package.json
+        version: '1.0.0',
     });
 };
 exports.getSystemSettings = getSystemSettings;
@@ -24,7 +24,6 @@ const updateSystemSettings = (req, res) => {
         config_1.config.systemName = systemName;
     if (systemLogo)
         config_1.config.systemLogo = systemLogo;
-    // Write to .env file to persist across restarts
     const envPath = path_1.default.resolve(process.cwd(), '.env');
     try {
         if (fs_1.default.existsSync(envPath)) {
@@ -56,13 +55,11 @@ const updateSystemSettings = (req, res) => {
 exports.updateSystemSettings = updateSystemSettings;
 const seedAdmin = async (req, res) => {
     try {
-        // Only allow if no users exist
         const userCount = await prisma_service_1.prisma.user.count();
         if (userCount > 0) {
             return res.status(403).json({ error: 'System already has users. Seeding restricted.' });
         }
         logger_1.logger.info('Starting manual system seed...');
-        // 1. Roles
         const roles = ['GUEST', 'STAFF', 'OPERATION', 'ADMIN', 'OWNER'];
         const roleMap = {};
         for (const roleName of roles) {
@@ -72,7 +69,6 @@ const seedAdmin = async (req, res) => {
                 create: { name: roleName },
             });
         }
-        // 2. Admin User
         const adminPassword = await bcryptjs_1.default.hash('admin123', 10);
         await prisma_service_1.prisma.user.upsert({
             where: { username: 'admin' },
@@ -83,7 +79,6 @@ const seedAdmin = async (req, res) => {
                 roleId: roleMap['ADMIN'].id,
             },
         });
-        // 3. Default Fee Config
         await prisma_service_1.prisma.feeConfig.upsert({
             where: { id: 'default' },
             update: {},
@@ -93,7 +88,6 @@ const seedAdmin = async (req, res) => {
                 taxPercent: 5,
             },
         });
-        // 4. Default Payment Modes
         const paymentModes = [
             { name: 'CASH', allowSplit: true },
             { name: 'CARD', allowSplit: true },

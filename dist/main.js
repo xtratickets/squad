@@ -62,7 +62,6 @@ function createWindow() {
     });
 }
 function startBackend() {
-    // Start the Express server as a child process
     const serverPath = path.join(__dirname, 'server.js');
     serverProcess = (0, child_process_1.fork)(serverPath, [], {
         env: { ...process.env, NODE_ENV: 'production' }
@@ -74,7 +73,6 @@ function startBackend() {
         console.error('Backend error:', err);
     });
 }
-// IPC Handlers
 electron_1.ipcMain.on('print-receipt', (event, content) => {
     let workerWindow = new electron_1.BrowserWindow({
         show: false,

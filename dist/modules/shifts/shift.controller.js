@@ -8,7 +8,6 @@ const openShift = async (req, res) => {
     const staffId = req.user.userId;
     const { openingCash } = req.body;
     try {
-        // Check if staff already has an open shift
         const existingShift = await prisma_service_1.prisma.shift.findFirst({
             where: { staffId, status: 'open' },
         });
@@ -190,7 +189,7 @@ const getShifts = async (req, res) => {
                 stats: shift.stats ? { ...shift.stats, expenses: shift.expenses } : { expenses: shift.expenses },
                 openedSessions,
                 paymentsByMode,
-                payments: undefined // remove full payments list from response to save bandwidth
+                payments: undefined
             };
         }));
         res.json({
@@ -207,11 +206,6 @@ const getShifts = async (req, res) => {
     }
 };
 exports.getShifts = getShifts;
-/**
- * GET /api/shifts/history
- * Returns past (closed) shifts for the currently authenticated user,
- * joined with session and order data.
- */
 const getShiftHistory = async (req, res) => {
     const staffId = req.user?.userId;
     if (!staffId) {
@@ -239,7 +233,7 @@ const getShiftHistory = async (req, res) => {
                         },
                     },
                     orders: {
-                        where: { sessionId: null }, // standalone orders not linked to a session
+                        where: { sessionId: null },
                         include: {
                             items: {
                                 include: { product: { select: { id: true, name: true, price: true } } },
@@ -290,10 +284,6 @@ const getShiftHistory = async (req, res) => {
     }
 };
 exports.getShiftHistory = getShiftHistory;
-/**
- * GET /api/shifts/all
- * Returns all shifts across all staff — for OPERATION and ADMIN roles.
- */
 const getAllShifts = async (req, res) => {
     try {
         const page = parseInt(req.query.page) || 1;
@@ -319,7 +309,6 @@ const getAllShifts = async (req, res) => {
             prisma_service_1.prisma.shift.count(),
             prisma_service_1.prisma.paymentMode.findMany({ where: { active: true } }),
         ]);
-        // Attach filtered payments to each session
         const data = shifts.map(shift => ({
             ...shift,
             stats: shift.stats ? { ...shift.stats, expenses: shift.expenses } : { expenses: shift.expenses },
@@ -328,7 +317,7 @@ const getAllShifts = async (req, res) => {
                 staffUsername: shift.staff?.username,
                 payments: shift.payments.filter((p) => p.referenceType === 'session' && p.referenceId === session.id),
             })),
-            payments: undefined, // strip raw payments array from shift level
+            payments: undefined,
         }));
         res.json({ data, total, page, pageSize, totalPages: Math.ceil(total / pageSize), modes: activeModes });
     }

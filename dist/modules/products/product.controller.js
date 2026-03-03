@@ -4,7 +4,6 @@ exports.deleteCategory = exports.deleteProduct = exports.getStockMovements = exp
 const prisma_service_1 = require("../../services/prisma.service");
 const logger_1 = require("../../utils/logger");
 const storage_service_1 = require("../../services/storage.service");
-// Categories
 const getCategories = async (req, res) => {
     try {
         const categories = await prisma_service_1.prisma.category.findMany({
@@ -32,7 +31,6 @@ const createCategory = async (req, res) => {
     }
 };
 exports.createCategory = createCategory;
-// Products
 const getProducts = async (req, res) => {
     const { page, pageSize } = req.query;
     try {
@@ -131,7 +129,6 @@ const updateProduct = async (req, res) => {
             return res.status(404).json({ error: 'Product not found' });
         let imageUrl = existingProduct.imageUrl;
         if (file) {
-            // Delete old image if it exists
             if (imageUrl) {
                 await storage_service_1.StorageService.deleteFile(imageUrl);
             }

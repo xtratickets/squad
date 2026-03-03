@@ -16,7 +16,6 @@ const recordSalary = async (req, res) => {
                 },
             });
             if (shiftId) {
-                // Update ShiftStats
                 await tx.shiftStats.update({
                     where: { shiftId },
                     data: {

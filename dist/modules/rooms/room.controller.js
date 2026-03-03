@@ -22,7 +22,6 @@ const listRooms = async (req, res) => {
             },
             orderBy: { name: 'asc' },
         });
-        // Flatten activeSession for convenience
         const result = rooms.map((r) => {
             const { sessions, ...rest } = r;
             return {

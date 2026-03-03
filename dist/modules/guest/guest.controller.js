@@ -144,7 +144,7 @@ const createGuestOrder = async (req, res) => {
             return res.status(400).json({ error: 'No active session for this room' });
         }
         const shiftId = session.openedShiftId;
-        const createdById = session.openedById; // Attribute to staff who opened the room
+        const createdById = session.openedById;
         let subtotal = 0;
         const products = await prisma_service_1.prisma.product.findMany({
             where: { id: { in: items.map((i) => i.productId) } }
@@ -180,13 +180,13 @@ const createGuestOrder = async (req, res) => {
                 },
                 include: {
                     items: { include: { product: true } },
-                    orderCharge: true // Will be null initially
+                    orderCharge: true
                 }
             });
             return o;
         });
         (0, socket_1.emitToRoom)(`room_${roomId}`, 'order_update', order);
-        (0, socket_1.broadcast)('order_notification', order); // Notify staff
+        (0, socket_1.broadcast)('order_notification', order);
         res.status(201).json(order);
     }
     catch (error) {

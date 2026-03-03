@@ -43,5 +43,5 @@ router.get('/rooms/:id/session', guestController.getGuestSession);
 router.post('/rooms/:id/orders', guestController.createGuestOrder);
 router.get('/menu', guestController.getPublicMenu);
 router.get('/reservations', guestController.getPublicReservations);
-router.post('/reservations', reservationController.createReservation); // Public reservation creation
+router.post('/reservations', reservationController.createReservation);
 exports.default = router;

@@ -23,7 +23,6 @@ const getOrders = async (req, res) => {
             orderCharge: true,
             room: { select: { name: true } },
         };
-        // If pagination params provided, return paginated envelope
         if (page !== undefined) {
             const pageNum = Math.max(1, parseInt(page, 10) || 1);
             const size = Math.min(100, Math.max(1, parseInt(pageSize, 10) || 10));
@@ -49,7 +48,6 @@ const getOrders = async (req, res) => {
                 totalPages: Math.ceil(total / size),
             });
         }
-        // Legacy: no pagination params — return flat array for backwards compatibility
         const flatOrders = await prisma_service_1.prisma.order.findMany({
             where,
             include,
@@ -114,7 +112,6 @@ const createOrder = async (req, res) => {
             }
             return o;
         });
-        // Realtime & Audit
         (0, socket_1.broadcast)('order.created', order);
         (0, socket_1.broadcast)('order_notification', order);
         await audit_service_1.AuditService.log('Order', order.id, 'CREATE', createdById, null, order);
@@ -134,9 +131,7 @@ const approveOrder = async (req, res) => {
         const order = await prisma_service_1.prisma.order.findUnique({
             where: { id },
             include: { items: true },
-            // ownerUserId is a scalar field — no include needed, it's on the order directly
         });
-        // Cast to access ownerUserId until Prisma client regenerates
         const orderData = order;
         if (!order || order.status !== 'pending') {
             return res.status(404).json({ error: 'Pending order not found' });
@@ -171,7 +166,6 @@ const approveOrder = async (req, res) => {
                 create: { orderId: order.id, shiftId: order.shiftId, ...charges },
                 update: { shiftId: order.shiftId, ...charges }
             });
-            // Owner order: deduct finalTotal from owner's wallet
             const ownerUserId = order.ownerUserId;
             if (order.type === 'owner' && ownerUserId) {
                 await tx.user.update({
@@ -187,7 +181,6 @@ const approveOrder = async (req, res) => {
                         shiftId: order.shiftId,
                     },
                 });
-                // Record as a payment to match revenue in ShiftStats
                 await tx.payment.create({
                     data: {
                         modeId: 'WALLET',
@@ -197,13 +190,11 @@ const approveOrder = async (req, res) => {
                         shiftId: order.shiftId,
                     }
                 });
-                // Track wallet payment in stats (overview cards)
                 await tx.shiftStats.update({
                     where: { shiftId: order.shiftId },
                     data: { paymentsWallet: { increment: charges.finalTotal } },
                 });
             }
-            // Update ShiftStats Revenue (Section 11)
             await tx.shiftStats.update({
                 where: { shiftId: order.shiftId },
                 data: {
@@ -227,7 +218,6 @@ const approveOrder = async (req, res) => {
                 include: { orderCharge: true },
             });
         });
-        // Realtime, Audit & Receipt
         (0, socket_1.broadcast)('order.approved', result);
         await audit_service_1.AuditService.log('Order', order.id, 'APPROVE', userId, order, result);
         await receipt_service_1.ReceiptService.createSnapshot('order', id);
@@ -276,9 +266,7 @@ const updateOrder = async (req, res) => {
         if (!order)
             return res.status(404).json({ error: 'Order not found' });
         const result = await prisma_service_1.prisma.$transaction(async (tx) => {
-            // If transition to cancelled from approved, revert everything
             if (status === 'cancelled' && order.status === 'approved') {
-                // 1. Revert stock
                 for (const item of order.items) {
                     await tx.product.update({
                         where: { id: item.productId },
@@ -288,7 +276,6 @@ const updateOrder = async (req, res) => {
                         data: { productId: item.productId, qty: item.qty, type: 'add', reference: `order_${order.id}_cancel` },
                     });
                 }
-                // 2. Revert ShiftStats revenue
                 if (order.orderCharge) {
                     const charge = order.orderCharge;
                     await tx.shiftStats.update({
@@ -299,7 +286,6 @@ const updateOrder = async (req, res) => {
                             tipsTotal: { decrement: charge.tip },
                         },
                     });
-                    // 3. If owner order, credit wallet back
                     const ownerUserId = order.ownerUserId;
                     if (order.type === 'owner' && ownerUserId) {
                         await tx.user.update({
@@ -315,7 +301,6 @@ const updateOrder = async (req, res) => {
                                 shiftId: order.shiftId,
                             },
                         });
-                        // Also revert the Payment record for the owner
                         const payment = await tx.payment.findFirst({
                             where: { referenceType: 'order', referenceId: id, modeId: 'WALLET' }
                         });
@@ -471,11 +456,6 @@ const updateOrderItems = async (req, res) => {
     }
 };
 exports.updateOrderItems = updateOrderItems;
-/**
- * POST /api/orders/:id/checkout
- * Body: { payments: [{ modeId: string, amount: number }], shiftId: string }
- * Records multiple payments for an order (split payment support).
- */
 const checkoutOrder = async (req, res) => {
     const id = req.params.id;
     const { payments, shiftId } = req.body;
@@ -515,7 +495,7 @@ const checkoutOrder = async (req, res) => {
                 else if (modeName === 'WALLET')
                     updateData.paymentsWallet = { increment: amount };
                 else
-                    updateData.paymentsCard = { increment: amount }; // INSTAPAY, CARD, etc. go here
+                    updateData.paymentsCard = { increment: amount };
                 if (Object.keys(updateData).length > 0) {
                     await tx.shiftStats.update({
                         where: { shiftId: shiftId || order.shiftId },

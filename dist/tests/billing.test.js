@@ -2,7 +2,6 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const billing_service_1 = require("../services/billing.service");
 const prisma_service_1 = require("../services/prisma.service");
-// Manually mock the prisma service
 jest.mock('../services/prisma.service', () => ({
     prisma: {
         session: {
@@ -27,7 +26,7 @@ describe('BillingService', () => {
         it('should calculate session charge correctly with minimum minutes', async () => {
             const sessionId = 'session-1';
             const startTime = new Date('2026-03-02T10:00:00Z');
-            const endTime = new Date('2026-03-02T10:15:00Z'); // 15 mins
+            const endTime = new Date('2026-03-02T10:15:00Z');
             const mockSession = {
                 id: sessionId,
                 startTime,
@@ -53,7 +52,7 @@ describe('BillingService', () => {
         it('should calculate session charge correctly with orders (no double tax)', async () => {
             const sessionId = 'session-2';
             const startTime = new Date('2026-03-02T10:00:00Z');
-            const endTime = new Date('2026-03-02T11:00:00Z'); // 60 mins
+            const endTime = new Date('2026-03-02T11:00:00Z');
             const mockSession = {
                 id: sessionId,
                 startTime,
@@ -63,9 +62,6 @@ describe('BillingService', () => {
                 },
                 orders: [
                     {
-                        // Order with 200 pre-tax. 
-                        // If it was already taxed (say 10% tax = 220 final), 
-                        // computeSessionCharge should pick up 200, not 220.
                         orderCharge: { itemsTotal: 200, discount: 0, finalTotal: 220 }
                     }
                 ],
@@ -78,16 +74,13 @@ describe('BillingService', () => {
             const result = await billing_service_1.BillingService.computeSessionCharge(sessionId, endTime);
             expect(result.durationMinutes).toBe(60);
             expect(result.roomAmount).toBe(100);
-            expect(result.ordersAmount).toBe(200); // Should be 200, not 220
-            // subtotal = 100 (room) + 200 (orders) = 300
-            // fees/tax (20% total) on 300 = 60
-            // finalTotal = 300 + 60 = 360
+            expect(result.ordersAmount).toBe(200);
             expect(result.finalTotal).toBe(360);
         });
         it('should apply discount correctly and cap it at subtotal', async () => {
             const sessionId = 'session-3';
             const startTime = new Date('2026-03-02T10:00:00Z');
-            const endTime = new Date('2026-03-02T11:00:00Z'); // 60 mins
+            const endTime = new Date('2026-03-02T11:00:00Z');
             const mockSession = {
                 id: sessionId,
                 startTime,

@@ -6,7 +6,6 @@ const logger_1 = require("../../utils/logger");
 const recordPayment = async (req, res) => {
     const { modeId, amount, referenceType, referenceId, shiftId, receiptUrl } = req.body;
     try {
-        // 1. Get the target charge to validate total payments
         let finalTotal = 0;
         if (referenceType === 'session') {
             const charge = await prisma_service_1.prisma.sessionCharge.findUnique({
@@ -27,13 +26,10 @@ const recordPayment = async (req, res) => {
         else {
             return res.status(400).json({ error: 'Invalid reference type' });
         }
-        // 2. Calculate existing payments
         const existingPayments = await prisma_service_1.prisma.payment.aggregate({
             where: { referenceType, referenceId },
             _sum: { amount: true },
         });
-        // Note: intentionally allow overpayment (e.g. cash customers paying a round number and receiving change)
-        // 4. Create payment and update shift stats (incremental update is preferred, but here we just create)
         const payment = await prisma_service_1.prisma.$transaction(async (tx) => {
             const p = await tx.payment.create({
                 data: {
@@ -45,7 +41,6 @@ const recordPayment = async (req, res) => {
                     receiptUrl,
                 },
             });
-            // Update ShiftStats (Section 11)
             const mode = await tx.paymentMode.findUnique({ where: { id: modeId } });
             if (!mode)
                 throw new Error('Payment mode not found');
@@ -87,7 +82,7 @@ const getPayments = async (req, res) => {
             if (startDate)
                 where.createdAt.gte = new Date(startDate);
             if (endDate)
-                where.createdAt.lt = new Date(new Date(endDate).getTime() + 86400000); // include full day
+                where.createdAt.lt = new Date(new Date(endDate).getTime() + 86400000);
         }
         const p = parseInt(page) || 1;
         const size = parseInt(pageSize) || 50;
@@ -124,11 +119,8 @@ const uploadReceipt = async (req, res) => {
         if (!req.file) {
             return res.status(400).json({ error: 'No receipt image provided' });
         }
-        // Upload the file to S3 Minio — gets back the raw object key
         const receiptKey = await storage_service_1.StorageService.uploadFile(req.file, 'receipts');
-        // Generate a presigned URL for the frontend to use for preview / display
         const receiptUrl = await storage_service_1.StorageService.getFileUrl(receiptKey);
-        // Return BOTH: the key (to store in DB) and the signed URL (to display immediately)
         res.status(200).json({ receiptKey, receiptUrl });
     }
     catch (error) {
@@ -145,7 +137,6 @@ const editPayment = async (req, res) => {
         const existing = await prisma_service_1.prisma.payment.findUnique({ where: { id } });
         if (!existing)
             return res.status(404).json({ error: 'Payment not found' });
-        // Staff can only change the payment mode, not the amount
         if (amount !== undefined && !['OPERATION', 'ADMIN'].includes(userRole)) {
             return res.status(403).json({ error: 'You are not allowed to edit the payment amount' });
         }

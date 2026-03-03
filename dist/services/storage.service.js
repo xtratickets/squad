@@ -57,7 +57,6 @@ class StorageService {
         try {
             const exists = await getMinioClient().bucketExists(bucketName);
             if (!exists) {
-                // Pass region when creating the bucket
                 await getMinioClient().makeBucket(bucketName, region);
                 logger_1.logger.info(`Bucket "${bucketName}" created.`);
                 const policy = {
@@ -85,7 +84,6 @@ class StorageService {
                 .replace(/\s+/g, '_')
                 .replace(/[^a-zA-Z0-9._\-]/g, '');
             const fileName = `${folder}/${Date.now()}-${sanitizedName}`;
-            // Size argument removed — pass metadata in the options object only
             await getMinioClient().putObject(bucketName, fileName, file.buffer);
             return fileName;
         }
@@ -111,7 +109,6 @@ class StorageService {
             if (!fileUrlOrName)
                 return fileUrlOrName;
             const fileName = extractObjectKey(fileUrlOrName);
-            // Generate a presigned URL valid for 24 hours
             return await getMinioClient().presignedGetObject(bucketName, fileName, 24 * 60 * 60);
         }
         catch (error) {
@@ -121,20 +118,14 @@ class StorageService {
     }
 }
 exports.StorageService = StorageService;
-/**
- * Extracts the MinIO object key from either a raw key or a full URL.
- * Handles legacy full URLs by stripping the leading /<bucketName>/ prefix safely.
- */
 function extractObjectKey(fileUrlOrName) {
     if (!fileUrlOrName.startsWith('http'))
         return fileUrlOrName;
     const urlPath = new URL(fileUrlOrName).pathname;
     const decoded = decodeURIComponent(urlPath);
-    // Strip the leading slash and bucket name prefix exactly once
     const prefix = `/${bucketName}/`;
     if (decoded.startsWith(prefix)) {
         return decoded.slice(prefix.length);
     }
-    // Fallback: strip any leading slash
     return decoded.startsWith('/') ? decoded.slice(1) : decoded;
 }

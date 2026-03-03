@@ -11,7 +11,6 @@ const getGlobalStats = async (req, res) => {
         const totalRevenueResult = await prisma_service_1.prisma.payment.aggregate({
             _sum: { amount: true },
         });
-        // Revenue by mode
         const revenueByMode = await prisma_service_1.prisma.payment.groupBy({
             by: ['modeId'],
             _sum: { amount: true },

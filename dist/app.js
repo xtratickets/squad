@@ -40,15 +40,12 @@ app.get('/env-config.js', (req, res) => {
     };
     res.send(`window.ENV = ${JSON.stringify(env)};`);
 });
-// Middleware
 app.use((0, cors_1.default)());
 app.use(express_1.default.json());
-// Logging middleware
 app.use((req, res, next) => {
     logger_1.logger.info({ method: req.method, url: req.url }, 'Request received');
     next();
 });
-// Routes
 app.use('/api/guest', guest_routes_1.default);
 app.use('/api/system', system_routes_1.default);
 app.use('/api/auth', auth_routes_1.default);
@@ -67,14 +64,12 @@ app.use('/api/promocodes', promocode_routes_1.default);
 app.use('/api/salaries', salary_routes_1.default);
 app.use('/api/wallet', wallet_routes_1.default);
 app.use('/api/owners', owner_routes_1.default);
-// Health check
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
-// Resolve frontend static path — tries multiple depths to handle different tsconfig outDir configs
 const candidatePaths = [
-    path_1.default.join(__dirname, '../frontend/dist'), // if outDir = ./dist
-    path_1.default.join(__dirname, '../../frontend/dist'), // if outDir = ./dist/src
+    path_1.default.join(__dirname, '../frontend/dist'),
+    path_1.default.join(__dirname, '../../frontend/dist'),
 ];
 const staticPath = candidatePaths.find(p => fs_1.default.existsSync(path_1.default.join(p, 'index.html'))) ?? candidatePaths[0];
 const indexHtmlPath = path_1.default.join(staticPath, 'index.html');
@@ -91,7 +86,6 @@ logger_1.logger.info({
 if (indexExists) {
     logger_1.logger.info({ staticPath }, 'Serving frontend static files');
     app.use(express_1.default.static(staticPath));
-    // Use a Regex literal for the catch-all to avoid path-to-regexp parsing issues in Express 5
     app.get(/^(?!\/api).*/, (req, res) => {
         if (req.url.startsWith('/api')) {
             logger_1.logger.warn({ method: req.method, url: req.url }, 'API route not found (falling to catch-all)');
@@ -103,6 +97,5 @@ if (indexExists) {
 else {
     logger_1.logger.warn({ staticPath, candidatePaths }, 'Frontend build (index.html) not found. Serving API only.');
 }
-// Error handling
 app.use(error_middleware_1.errorHandler);
 exports.default = app;

@@ -16,7 +16,7 @@ const getUsers = async (req, res) => {
                 include: { role: true },
                 skip: (page - 1) * pageSize,
                 take: pageSize,
-                orderBy: { username: 'asc' }, // Ensure consistent pagination order
+                orderBy: { username: 'asc' },
             }),
             prisma_service_1.prisma.user.count()
         ]);
@@ -46,7 +46,6 @@ const createUser = async (req, res) => {
             },
             include: { role: true },
         });
-        // @ts-ignore
         delete user.password;
         res.status(201).json(user);
     }
@@ -72,7 +71,6 @@ const updateUser = async (req, res) => {
             data,
             include: { role: true },
         });
-        // @ts-ignore
         delete user.password;
         res.json(user);
     }
@@ -107,7 +105,6 @@ const deleteUser = async (req, res) => {
     }
 };
 exports.deleteUser = deleteUser;
-// For selection lists (e.g. owners), returns simplified objects
 const getUsersList = async (req, res) => {
     try {
         const users = await prisma_service_1.prisma.user.findMany({

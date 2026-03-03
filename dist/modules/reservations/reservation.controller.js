@@ -10,12 +10,7 @@ const createReservation = async (req, res) => {
     const start = new Date(startTime);
     const end = endTime ? new Date(endTime) : null;
     try {
-        // ── Overlap Check ──────────────────────────────────────────────────
-        // Treat open-timed reservations (no endTime) as occupying from startTime to forever.
-        // A conflict exists when:
-        //   (A) existing starts before new ends AND existing ends (or is open) after new starts
         const conflictConditions = [
-            // Existing has endTime and its window overlaps the new slot
             {
                 AND: [
                     { endTime: { not: null } },
@@ -23,7 +18,6 @@ const createReservation = async (req, res) => {
                     { endTime: { gt: start } },
                 ],
             },
-            // Existing is open-timed (no endTime): it starts before the new reservation ends
             {
                 AND: [
                     { endTime: null },
@@ -77,11 +71,6 @@ const getReservations = async (req, res) => {
     }
 };
 exports.getReservations = getReservations;
-/**
- * PATCH /api/reservations/:id/status
- * Body: { status: 'confirmed' | 'cancelled' | 'checked_in' }
- * Approves or cancels a reservation and emits reservation_update.
- */
 const updateReservationStatus = async (req, res) => {
     const id = req.params.id;
     const { status } = req.body;

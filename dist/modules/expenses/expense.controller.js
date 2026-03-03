@@ -16,7 +16,6 @@ const createExpense = async (req, res) => {
                     createdById,
                 },
             });
-            // Update ShiftStats
             await tx.shiftStats.update({
                 where: { shiftId },
                 data: {

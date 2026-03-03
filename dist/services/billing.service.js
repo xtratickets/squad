@@ -22,23 +22,19 @@ class BillingService {
         if (!session)
             throw new Error('Session not found');
         const durationMs = endTime.getTime() - session.startTime.getTime();
-        // Subtract paused duration in milliseconds for maximum precision
         let totalPausedMs = session.totalPausedMs || 0;
         if (session.isPaused && session.lastPausedAt) {
             totalPausedMs += endTime.getTime() - new Date(session.lastPausedAt).getTime();
         }
         const billableMs = Math.max(0, durationMs - totalPausedMs);
         const billableMinutes = Math.max(Math.ceil(billableMs / 60000), session.room.minMinutes);
-        // Room amount
         const roomAmount = (billableMinutes / 60) * session.room.pricePerHour;
-        // Orders total (pre-tax/fee portion to avoid double taxing when session taxes it again)
         const ordersAmount = session.orders.reduce((sum, order) => sum + ((order.orderCharge?.itemsTotal || 0) - (order.orderCharge?.discount || 0)), 0);
-        // Get group fee config
         const feeConfig = await prisma_service_1.prisma.feeConfig.findUnique({
             where: { id: 'default' },
         });
         const subtotal = roomAmount + ordersAmount;
-        const discount = Math.min(discountAmount, subtotal); // Cannot discount more than subtotal
+        const discount = Math.min(discountAmount, subtotal);
         const discountedSubtotal = subtotal - discount;
         const serviceFee = (discountedSubtotal * (feeConfig?.serviceFeePercent || 0)) / 100;
         const tax = (discountedSubtotal * (feeConfig?.taxPercent || 0)) / 100;
