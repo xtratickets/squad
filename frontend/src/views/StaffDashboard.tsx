@@ -637,12 +637,17 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ sessionId, roomName, shiftI
                                 </div>
 
                                 {(() => {
+                                    const discountAmt = baseFinalTotal - finalDue;
                                     const adjustments = [
-                                        ...(promoDiscount ? [{ label: 'Promo Discount', value: -(baseFinalTotal - finalDue), isPromo: true }] : []),
-                                        ...(b!.discount > 0 && !promoDiscount ? [{ label: 'Discount', value: -b!.discount }] : []),
+                                        // Promo line info
+                                        ...(promoDiscount ? [{ label: `Promo Code: ${promoCode}`, value: 0, isPromo: true, isInfo: true }] : []),
+                                        // Discount value (always show if promo active or discount > 0)
+                                        ...(promoDiscount || b!.discount > 0 ? [{ label: 'DISCOUNT', value: -Math.max(b!.discount, discountAmt) }] : []),
+                                        // Fees
                                         ...(b!.serviceFee > 0 ? [{ label: 'Service Fee', value: b!.serviceFee }] : []),
                                         ...(b!.tax > 0 ? [{ label: 'Tax', value: b!.tax }] : []),
-                                        ...(b!.tip > 0 ? [{ label: 'Included Tip', value: b!.tip }] : []),
+                                        // Tip (calculated statically or from input)
+                                        { label: 'TIP', value: Math.max(b!.tip, parseFloat(tipInput || '0')) },
                                     ];
 
                                     if (adjustments.length === 0) return null;
@@ -652,8 +657,8 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ sessionId, roomName, shiftI
                                             {adjustments.map((row, i) => (
                                                 <div key={i} className="receipt-row" style={{ fontSize: '12px', marginBottom: i === adjustments.length - 1 ? 0 : '8px' }}>
                                                     <span style={{ color: (row as any).isPromo ? 'var(--primary)' : 'var(--text-muted)', fontWeight: (row as any).isPromo ? '700' : '500' }}>{row.label}</span>
-                                                    <span className="mono" style={{ color: row.value < 0 ? 'var(--primary)' : 'var(--text)', fontWeight: '600' }}>
-                                                        {row.value < 0 ? '-' : '+'} EGP {fmt(Math.abs(row.value))}
+                                                    <span className="mono" style={{ color: (row as any).isInfo ? 'var(--primary)' : (row.value < 0 ? 'var(--primary)' : 'var(--text)'), fontWeight: '600' }}>
+                                                        {(row as any).isInfo ? '' : (row.value < 0 ? '-' : '+')} {(row as any).isInfo ? '' : 'EGP '} {(row as any).isInfo ? '' : fmt(Math.abs(row.value))}
                                                     </span>
                                                 </div>
                                             ))}
@@ -663,8 +668,25 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ sessionId, roomName, shiftI
 
                                 <div className="receipt-print-total" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 0', borderTop: '2px solid var(--text)', borderBottom: '2px solid var(--text)', margin: '10px 0 20px 0' }}>
                                     <span style={{ fontSize: '18px', fontWeight: '900', letterSpacing: '1px' }}>TOTAL DUE</span>
-                                    <span style={{ fontSize: '24px', fontWeight: '900' }} className="mono">EGP {fmt(finalDue)}</span>
+                                    <span style={{ fontSize: '24px', fontWeight: '900' }} className="mono">EGP {fmt(finalDue + parseFloat(tipInput || '0'))}</span>
                                 </div>
+
+                                {/* Dynamic Payments Collected Summary */}
+                                {payments.some(p => parseFloat(p.amount || '0') > 0) && (
+                                    <div style={{ marginTop: '10px' }}>
+                                        <div style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1.5px', marginBottom: '10px', fontWeight: '700' }}>Payments Collected</div>
+                                        {payments.filter(p => parseFloat(p.amount || '0') > 0).map((p) => {
+                                            const modeName = modes.find(m => m.id === p.modeId)?.name || 'Unknown';
+                                            return (
+                                                <div key={p.id} className="receipt-row" style={{ fontSize: '13px', marginBottom: '4px' }}>
+                                                    <span style={{ fontWeight: '600' }}>{modeName.toUpperCase()}</span>
+                                                    <span className="mono">EGP {fmt(parseFloat(p.amount || '0'))}</span>
+                                                </div>
+                                            );
+                                        })}
+                                        <div className="receipt-divider" />
+                                    </div>
+                                )}
                             </div>
 
                             {/* Print Footer */}

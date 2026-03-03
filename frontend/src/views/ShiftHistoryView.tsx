@@ -533,7 +533,7 @@ const ShiftHistoryView: React.FC<ShiftHistoryViewProps> = ({ user }) => {
                                     )}
 
                                     {((viewSession.sessionCharge as any).discount > 0 || (viewSession.sessionCharge as any).promoCode) && (
-                                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
                                             <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                                 <span style={{ background: 'rgba(239,68,68,0.15)', color: '#f87171', fontSize: '11px', padding: '1px 8px', borderRadius: '8px', fontWeight: 700 }}>DISCOUNT</span>
                                             </span>
@@ -542,27 +542,25 @@ const ShiftHistoryView: React.FC<ShiftHistoryViewProps> = ({ user }) => {
                                     )}
 
                                     {((viewSession.sessionCharge as any).serviceFee || 0) > 0 && (
-                                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
                                             <span style={{ color: 'var(--text-muted)' }}>Service Fee</span>
                                             <span>{formatCurrency((viewSession.sessionCharge as any).serviceFee)}</span>
                                         </div>
                                     )}
 
                                     {((viewSession.sessionCharge as any).tax || 0) > 0 && (
-                                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
                                             <span style={{ color: 'var(--text-muted)' }}>Tax</span>
                                             <span>{formatCurrency((viewSession.sessionCharge as any).tax)}</span>
                                         </div>
                                     )}
 
-                                    {(viewSession.sessionCharge as any).tip > 0 && (
-                                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                            <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                <span style={{ background: 'rgba(0,230,118,0.12)', color: 'var(--primary)', fontSize: '11px', padding: '1px 8px', borderRadius: '8px', fontWeight: 700 }}>TIP</span>
-                                            </span>
-                                            <span style={{ color: 'var(--primary)', fontWeight: 600 }}>+{formatCurrency((viewSession.sessionCharge as any).tip)}</span>
-                                        </div>
-                                    )}
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                                        <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                            <span style={{ background: 'rgba(0,230,118,0.12)', color: 'var(--primary)', fontSize: '11px', padding: '1px 8px', borderRadius: '8px', fontWeight: 700 }}>TIP</span>
+                                        </span>
+                                        <span style={{ color: 'var(--primary)', fontWeight: 600 }}>+{formatCurrency((viewSession.sessionCharge as any).tip || 0)}</span>
+                                    </div>
 
                                     <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--border)', paddingTop: '8px', fontWeight: 700 }}>
                                         <span>Final Total</span>
