@@ -110,14 +110,15 @@ const App: React.FC = () => {
   };
 
   const isGuestBooking = window.location.hash.includes('#/book') || window.location.pathname.includes('/book');
-  const isGuestRoom = window.location.hash.includes('#/room/') || window.location.pathname.includes('/room/');
+  const isGuestRoom = window.location.hash.includes('#/room/') || window.location.pathname.includes('/room/') ||
+    window.location.hash.includes('#/order/') || window.location.pathname.includes('/order/');
 
   if (isGuestBooking) {
     return <GuestBookingView systemSettings={systemSettings} />;
   }
 
   if (isGuestRoom) {
-    const match = window.location.hash.match(/#\/room\/([a-zA-Z0-9-]+)/) || window.location.pathname.match(/\/room\/([a-zA-Z0-9-]+)/);
+    const match = window.location.hash.match(/#\/(?:room|order)\/([a-zA-Z0-9-]+)/) || window.location.pathname.match(/\/(?:room|order)\/([a-zA-Z0-9-]+)/);
     const roomId = match ? match[1] : '';
     if (roomId) return <GuestOrderingView roomId={roomId} systemSettings={systemSettings} />;
   }

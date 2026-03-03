@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import toast from 'react-hot-toast';
 import { adminService } from '../services/admin.service';
 import { roomService } from '../services/room.service';
@@ -6,6 +6,7 @@ import GlassPanel from '../components/common/GlassPanel';
 import Button from '../components/common/Button';
 import { Input } from '../components/common/FormElements';
 import api from '../services/api';
+import { RefreshCw } from 'lucide-react';
 import type { Product, Category, Room, Shift, PaymentMode } from '../types';
 
 interface CartItem {
@@ -20,43 +21,90 @@ interface OrdersViewProps {
     currentShift: Shift | null;
 }
 
+const errMsg = (err: unknown, fallback: string) => {
+    if (err && typeof err === 'object' && 'response' in err)
+        return (err as { response?: { data?: { error?: string } } }).response?.data?.error ?? fallback;
+    return fallback;
+};
+
 const OrdersView: React.FC<OrdersViewProps> = ({ rooms, currentShift }) => {
     const [products, setProducts] = useState<Product[]>([]);
     const [categories, setCategories] = useState<Category[]>([]);
     const [users, setUsers] = useState<{ id: string; username: string; walletBalance: number }[]>([]);
-    const [activeCat, setActiveCat] = useState<string | null>(null);
+    const [activeCatId, setActiveCatId] = useState<string>('all');
     const [cart, setCart] = useState<CartItem[]>([]);
     const [orderType, setOrderType] = useState<'regular' | 'owner' | 'room'>('room');
     const [selectedRoomId, setSelectedRoomId] = useState<string>('');
     const [ownerUserId, setOwnerUserId] = useState<string>('');
     const [searchTerm, setSearchTerm] = useState('');
+    const [debouncedSearch, setDebouncedSearch] = useState('');
+    const [page, setPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const [loading, setLoading] = useState(false);
+    const [loadingMore, setLoadingMore] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [paymentModes, setPaymentModes] = useState<PaymentMode[]>([]);
     const [paymentModeId, setPaymentModeId] = useState<string>('');
 
+    // Debounce search
     useEffect(() => {
-        const load = async () => {
-            try {
-                const [p, c, u, m] = await Promise.all([
-                    adminService.getProducts(),
-                    adminService.getCategories(),
-                    adminService.getUsersList(),
-                    api.get('/payments/modes'),
-                ]);
-                setProducts((p.data as any).data || []);
-                setCategories(c.data as Category[]);
-                setUsers(u.data);
-                const modes: PaymentMode[] = m.data ?? [];
-                setPaymentModes(modes);
-                if (modes.length) setPaymentModeId(modes[0].id);
-                if ((c.data as Category[]).length) setActiveCat((c.data as Category[])[0].id);
-                if (u.data.length > 0) setOwnerUserId(u.data[0].id);
-            } catch (err) {
-                console.error('Error loading products/categories/users', err);
-            }
-        };
-        void load();
+        const timer = setTimeout(() => setDebouncedSearch(searchTerm), 500);
+        return () => clearTimeout(timer);
+    }, [searchTerm]);
+
+    // Initial load for categories, users, payment modes
+    useEffect(() => {
+        Promise.all([
+            adminService.getCategories(),
+            adminService.getUsersList(),
+            api.get('/payments/modes'),
+        ]).then(([c, u, m]) => {
+            setCategories(c.data);
+            setUsers(u.data);
+            const modes: PaymentMode[] = m.data ?? [];
+            setPaymentModes(modes);
+            if (modes.length) setPaymentModeId(modes[0].id);
+            if (u.data.length > 0) setOwnerUserId(u.data[0].id);
+        }).catch(err => {
+            console.error('Error loading initial data', err);
+            toast.error('Failed to load categories or users');
+        });
     }, []);
+
+    // Load products when search, category, or page changes
+    const loadProducts = useCallback(async (isLoadMore = false) => {
+        const targetPage = isLoadMore ? page + 1 : 1;
+        if (isLoadMore) setLoadingMore(true); else setLoading(true);
+
+        try {
+            const res = await adminService.getProducts({
+                page: targetPage,
+                pageSize: 20,
+                search: debouncedSearch,
+                categoryId: (debouncedSearch || activeCatId === 'all') ? undefined : activeCatId
+            });
+
+            const newProducts = res.data.data;
+            if (isLoadMore) {
+                setProducts(prev => [...prev, ...newProducts]);
+                setPage(targetPage);
+            } else {
+                setProducts(newProducts);
+                setPage(1);
+            }
+            setTotalPages(res.data.totalPages);
+        } catch (err) {
+            console.error('Failed to load products', err);
+            toast.error('Failed to load products');
+        } finally {
+            setLoading(false);
+            setLoadingMore(false);
+        }
+    }, [debouncedSearch, activeCatId, page]);
+
+    useEffect(() => {
+        void loadProducts();
+    }, [debouncedSearch, activeCatId]);
 
     const addToCart = (p: Product) => {
         setCart(prev => {
@@ -73,6 +121,8 @@ const OrdersView: React.FC<OrdersViewProps> = ({ rooms, currentShift }) => {
             return prev.filter(i => i.productId !== productId);
         });
     };
+
+    const cartTotal = cart.reduce((s, i) => s + i.price * i.qty, 0);
 
     const placeOrder = async () => {
         if (!currentShift) return toast.error('Please open a shift first!');
@@ -99,10 +149,8 @@ const OrdersView: React.FC<OrdersViewProps> = ({ rooms, currentShift }) => {
                 ...(orderType === 'owner' ? { ownerUserId } : {})
             });
 
-            // Auto-approve all manually placed orders — only guest-submitted orders need review
             await adminService.approveOrder(res.data.id);
 
-            // For walk-in orders, record the payment immediately
             if (orderType === 'regular' && cartTotal > 0 && paymentModeId) {
                 await api.post('/payments', {
                     modeId: paymentModeId,
@@ -116,20 +164,11 @@ const OrdersView: React.FC<OrdersViewProps> = ({ rooms, currentShift }) => {
             toast.success('Order placed successfully');
             setCart([]);
         } catch (err: unknown) {
-            const msg = err && typeof err === 'object' && 'response' in err
-                ? (err as { response?: { data?: { error?: string } } }).response?.data?.error : undefined;
-            toast.error(msg || (err as Error).message || 'Order failed');
+            toast.error(errMsg(err, 'Order failed'));
         } finally {
             setSubmitting(false);
         }
     };
-
-    const filteredProducts = products.filter(p =>
-        (!activeCat || p.categoryId === activeCat) &&
-        (p.name.toLowerCase().includes(searchTerm.toLowerCase()))
-    );
-
-    const cartTotal = cart.reduce((s, i) => s + i.price * i.qty, 0);
 
     return (
         <div style={{ display: 'flex', gap: '30px', height: 'calc(100vh - 180px)' }}>
@@ -144,13 +183,21 @@ const OrdersView: React.FC<OrdersViewProps> = ({ rooms, currentShift }) => {
                     />
                 </div>
 
-                <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '10px', scrollbarWidth: 'none' }}>
+                <div style={{ display: 'flex', height: '120px', gap: '10px', overflowX: 'auto', boxSizing: 'border-box', marginBottom: '20px', scrollbarWidth: 'none' }}>
+                    <Button
+                        variant={activeCatId === 'all' ? 'primary' : 'secondary'}
+                        size="small"
+                        onClick={() => setActiveCatId('all')}
+                        style={{ whiteSpace: 'nowrap' }}
+                    >
+                        All Categories
+                    </Button>
                     {categories.map(c => (
                         <Button
                             key={c.id}
-                            variant={activeCat === c.id ? 'primary' : 'secondary'}
+                            variant={activeCatId === c.id ? 'primary' : 'secondary'}
                             size="small"
-                            onClick={() => setActiveCat(c.id)}
+                            onClick={() => setActiveCatId(c.id)}
                             style={{ whiteSpace: 'nowrap' }}
                         >
                             {c.name}
@@ -163,24 +210,49 @@ const OrdersView: React.FC<OrdersViewProps> = ({ rooms, currentShift }) => {
                     gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
                     gap: '20px',
                     overflowY: 'auto',
-                    paddingRight: '5px'
+                    paddingRight: '5px',
+                    position: 'relative',
+                    minHeight: loading ? '200px' : 'auto'
                 }}>
-                    {filteredProducts.map(p => (
+                    {loading && (
+                        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.1)', borderRadius: '12px' }}>
+                            <RefreshCw className="animate-spin" size={24} />
+                        </div>
+                    )}
+                    {products.map(p => (
                         <GlassPanel
                             key={p.id}
                             style={{
                                 padding: '15px',
                                 textAlign: 'center',
                                 cursor: 'pointer',
-                                transition: 'transform 0.1s ease'
+                                transition: 'transform 0.1s ease',
+                                opacity: p.stockQty !== undefined && p.stockQty <= 0 ? 0.6 : 1
                             }}
                             onClick={() => addToCart(p)}
                         >
                             <div style={{ fontWeight: '600', marginBottom: '8px' }}>{p.name}</div>
                             <div style={{ color: 'var(--primary)', fontWeight: 'bold' }}>EGP {p.price.toFixed(2)}</div>
+                            {p.stockQty !== undefined && (
+                                <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                                    Stock: {p.stockQty}
+                                </div>
+                            )}
                         </GlassPanel>
                     ))}
                 </div>
+
+                {totalPages > page && (
+                    <div style={{ display: 'flex', justifyContent: 'center', marginTop: '10px' }}>
+                        <Button
+                            variant="secondary"
+                            onClick={() => void loadProducts(true)}
+                            loading={loadingMore}
+                        >
+                            Load More Products
+                        </Button>
+                    </div>
+                )}
             </div>
 
             {/* Cart Section */}
