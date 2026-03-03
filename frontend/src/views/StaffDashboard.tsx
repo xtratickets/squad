@@ -908,11 +908,17 @@ interface NewOrderModalProps {
 
 const NewOrderModal: React.FC<NewOrderModalProps> = ({ shiftId, roomId, roomName, sessionId, modes = [], onCreated, onClose }) => {
     const [orderType, setOrderType] = useState<'regular' | 'owner' | 'room'>(roomId ? 'room' : 'regular');
-    const [products, setProducts] = useState<{ id: string; name: string; price: number; stockQty: number; imageUrl?: string; category?: { name: string } }[]>([]);
+    const [products, setProducts] = useState<{ id: string; name: string; price: number; stockQty: number; imageUrl?: string; category?: { id: string; name: string } }[]>([]);
+    const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
     const [users, setUsers] = useState<{ id: string; username: string; walletBalance: number }[]>([]);
     const [cart, setCart] = useState<CartItem[]>([]);
     const [search, setSearch] = useState('');
+    const [debouncedSearch, setDebouncedSearch] = useState('');
+    const [selectedCategoryId, setSelectedCategoryId] = useState<string>('all');
+    const [page, setPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
     const [loading, setLoading] = useState(false);
+    const [loadingMore, setLoadingMore] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [ownerUserId, setOwnerUserId] = useState('');
     const [promoCode, setPromoCode] = useState('');
@@ -921,53 +927,60 @@ const NewOrderModal: React.FC<NewOrderModalProps> = ({ shiftId, roomId, roomName
     const [loadingPromo, setLoadingPromo] = useState(false);
     const [selectedModeId, setSelectedModeId] = useState<string>(modes.find(m => m.name.toLowerCase() === 'cash')?.id ?? modes[0]?.id ?? '');
 
+    // Debounce search
     useEffect(() => {
-        setLoading(true);
+        const timer = setTimeout(() => setDebouncedSearch(search), 500);
+        return () => clearTimeout(timer);
+    }, [search]);
+
+    // Initial load for categories and users
+    useEffect(() => {
         Promise.all([
-            adminService.getProducts(),
+            adminService.getCategories(),
             adminService.getUsersList(),
-        ]).then(([pRes, uRes]) => {
-            setProducts((pRes.data as any).data || (pRes.data as any));
+        ]).then(([cRes, uRes]) => {
+            setCategories(cRes.data);
             setUsers(uRes.data);
             if (uRes.data.length > 0) setOwnerUserId(uRes.data[0].id);
-        }).catch(console.error).finally(() => setLoading(false));
+        }).catch(console.error);
     }, []);
 
-    const selectedOwner = users.find(u => u.id === ownerUserId);
-    const calculateTotal = () => {
-        const subtotal = cart.reduce((s, c) => s + c.price * c.qty, 0);
-        let discountAmt = 0;
-        if (promoDiscount && promoDiscount.applyTo !== 'room') {
-            if (promoDiscount.type === 'percent') {
-                discountAmt = subtotal * (promoDiscount.value / 100);
-            } else {
-                discountAmt = Math.min(promoDiscount.value, subtotal);
-            }
-        }
-        return Math.max(0, subtotal - discountAmt);
-    };
+    // Load products when search, category, or page changes
+    const loadProducts = useCallback(async (isLoadMore = false) => {
+        const targetPage = isLoadMore ? page + 1 : 1;
+        if (isLoadMore) setLoadingMore(true); else setLoading(true);
 
-    const cartTotal = calculateTotal();
-    const ownerLowBalance = orderType === 'owner' && selectedOwner && selectedOwner.walletBalance < cartTotal;
-    const subTotal = cart.reduce((s, c) => s + c.price * c.qty, 0);
-
-    const validatePromo = async () => {
-        if (!promoCode.trim()) return;
-        setLoadingPromo(true);
-        setPromoError('');
         try {
-            // we will need to import api from api service or use fetch directly since we don't have it in admin.service
-            const res = await import('../services/api').then(m => m.default.get(`/promocodes/${promoCode}`));
-            setPromoDiscount({ type: res.data.type, value: res.data.value, applyTo: res.data.applyTo ?? 'both' });
-        } catch (err) {
-            setPromoDiscount(null);
-            setPromoError(errMsg(err, 'Invalid or expired promo code'));
-        } finally {
-            setLoadingPromo(false);
-        }
-    };
+            const res = await adminService.getProducts({
+                page: targetPage,
+                pageSize: 20,
+                search: debouncedSearch,
+                categoryId: (debouncedSearch || selectedCategoryId === 'all') ? undefined : selectedCategoryId
+            });
 
-    const addToCart = (p: typeof products[0]) => {
+            const newProducts = res.data.data;
+            if (isLoadMore) {
+                setProducts(prev => [...prev, ...newProducts]);
+                setPage(targetPage);
+            } else {
+                setProducts(newProducts);
+                setPage(1);
+            }
+            setTotalPages(res.data.totalPages);
+        } catch (err) {
+            console.error('Failed to load products', err);
+            toast.error('Failed to load products');
+        } finally {
+            setLoading(false);
+            setLoadingMore(false);
+        }
+    }, [debouncedSearch, selectedCategoryId, page]);
+
+    useEffect(() => {
+        void loadProducts();
+    }, [debouncedSearch, selectedCategoryId]);
+
+    const addToCart = (p: any) => {
         setCart(prev => {
             const existing = prev.find(c => c.productId === p.id);
             if (existing) return prev.map(c => c.productId === p.id ? { ...c, qty: c.qty + 1 } : c);
@@ -997,37 +1010,54 @@ const NewOrderModal: React.FC<NewOrderModalProps> = ({ shiftId, roomId, roomName
                 promoCode: promoDiscount ? promoCode : undefined,
                 ...(orderType === 'owner' ? { ownerUserId } : {}),
             });
-            // Auto-approve all manual (staff-created) orders — only guest orders need approval
             await adminService.approveOrder(res.data.id);
-
-            // If it's a walk-in order (regular) and not an owner or room order, process payment
             if (orderType === 'regular' && selectedModeId) {
                 await adminService.checkoutOrder(res.data.id, {
                     shiftId,
-                    payments: [{ modeId: selectedModeId, amount: cartTotal }]
+                    payments: [{ modeId: selectedModeId, amount: calculateTotal() }]
                 });
             }
-
             onCreated();
             toast.success('Order created successfully');
         } catch (err) {
-            const msg = (err as { response?: { data?: { error?: string } } }).response?.data?.error ?? 'Failed to create order';
-            toast.error(msg);
+            toast.error(errMsg(err, 'Failed to create order'));
         } finally {
             setSubmitting(false);
         }
     };
 
-    const [selectedCategory, setSelectedCategory] = useState<string>('all');
+    const calculateTotal = () => {
+        const subtotal = cart.reduce((s, c) => s + c.price * c.qty, 0);
+        let discountAmt = 0;
+        if (promoDiscount && promoDiscount.applyTo !== 'room') {
+            if (promoDiscount.type === 'percent') {
+                discountAmt = subtotal * (promoDiscount.value / 100);
+            } else {
+                discountAmt = Math.min(promoDiscount.value, subtotal);
+            }
+        }
+        return Math.max(0, subtotal - discountAmt);
+    };
 
-    const filtered = products.filter(p => {
-        const matchesSearch = p.name.toLowerCase().includes(search.toLowerCase());
-        const matchesCategory = selectedCategory === 'all' || p.category?.name === selectedCategory;
-        return matchesSearch && matchesCategory && p.stockQty > 0;
-    });
+    const cartTotal = calculateTotal();
+    const selectedOwner = users.find(u => u.id === ownerUserId);
+    const ownerLowBalance = orderType === 'owner' && selectedOwner && selectedOwner.walletBalance < cartTotal;
+    const subTotal = cart.reduce((s, c) => s + c.price * c.qty, 0);
 
-    // Derive unique categories from products
-    const uniqueCategories = Array.from(new Set(products.map(p => p.category?.name).filter(Boolean))) as string[];
+    const validatePromo = async () => {
+        if (!promoCode.trim()) return;
+        setLoadingPromo(true);
+        setPromoError('');
+        try {
+            const res = await import('../services/api').then(m => m.default.get(`/promocodes/${promoCode}`));
+            setPromoDiscount({ type: res.data.type, value: res.data.value, applyTo: res.data.applyTo ?? 'both' });
+        } catch (err) {
+            setPromoDiscount(null);
+            setPromoError(errMsg(err, 'Invalid or expired promo code'));
+        } finally {
+            setLoadingPromo(false);
+        }
+    };
 
     return (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
@@ -1045,7 +1075,7 @@ const NewOrderModal: React.FC<NewOrderModalProps> = ({ shiftId, roomId, roomName
                     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', borderRight: '1px solid var(--border)', overflow: 'hidden' }}>
                         <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border)' }}>
                             <input
-                                placeholder="Search products…"
+                                placeholder="Search products (searches all categories)…"
                                 value={search}
                                 onChange={e => setSearch(e.target.value)}
                                 style={{ width: '100%', padding: '10px 14px', background: 'rgba(255,255,255,0.06)', border: '1px solid var(--border)', color: 'var(--text)', borderRadius: '8px', boxSizing: 'border-box' }}
@@ -1053,37 +1083,37 @@ const NewOrderModal: React.FC<NewOrderModalProps> = ({ shiftId, roomId, roomName
                             {/* Categories */}
                             <div style={{ display: 'flex', gap: '8px', marginTop: '12px', overflowX: 'auto', paddingBottom: '4px' }}>
                                 <button
-                                    onClick={() => setSelectedCategory('all')}
+                                    onClick={() => setSelectedCategoryId('all')}
                                     style={{
                                         padding: '6px 14px', borderRadius: '16px', fontSize: '12px', fontWeight: '700', whiteSpace: 'nowrap',
-                                        background: selectedCategory === 'all' ? 'var(--primary)' : 'rgba(255,255,255,0.06)',
-                                        color: selectedCategory === 'all' ? '#000' : 'var(--text)',
-                                        border: '1px solid', borderColor: selectedCategory === 'all' ? 'var(--primary)' : 'var(--border)',
+                                        background: selectedCategoryId === 'all' ? 'var(--primary)' : 'rgba(255,255,255,0.06)',
+                                        color: selectedCategoryId === 'all' ? '#000' : 'var(--text)',
+                                        border: '1px solid', borderColor: selectedCategoryId === 'all' ? 'var(--primary)' : 'var(--border)',
                                         cursor: 'pointer', transition: 'all 0.2s'
                                     }}
                                 >
-                                    All
+                                    All Categories
                                 </button>
-                                {uniqueCategories.map(cat => (
+                                {categories.map(cat => (
                                     <button
-                                        key={cat}
-                                        onClick={() => setSelectedCategory(cat)}
+                                        key={cat.id}
+                                        onClick={() => setSelectedCategoryId(cat.id)}
                                         style={{
                                             padding: '6px 14px', borderRadius: '16px', fontSize: '12px', fontWeight: '700', whiteSpace: 'nowrap',
-                                            background: selectedCategory === cat ? 'var(--primary)' : 'rgba(255,255,255,0.06)',
-                                            color: selectedCategory === cat ? '#000' : 'var(--text)',
-                                            border: '1px solid', borderColor: selectedCategory === cat ? 'var(--primary)' : 'var(--border)',
+                                            background: selectedCategoryId === cat.id ? 'var(--primary)' : 'rgba(255,255,255,0.06)',
+                                            color: selectedCategoryId === cat.id ? '#000' : 'var(--text)',
+                                            border: '1px solid', borderColor: selectedCategoryId === cat.id ? 'var(--primary)' : 'var(--border)',
                                             cursor: 'pointer', transition: 'all 0.2s'
                                         }}
                                     >
-                                        {cat}
+                                        {cat.name}
                                     </button>
                                 ))}
                             </div>
                         </div>
                         <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '10px', alignContent: 'start' }}>
-                            {loading && <div style={{ color: 'var(--text-muted)', fontSize: '13px', gridColumn: '1/-1' }}>Loading…</div>}
-                            {filtered.map(p => (
+                            {loading && products.length === 0 && <div style={{ color: 'var(--text-muted)', fontSize: '13px', gridColumn: '1/-1', textAlign: 'center', padding: '20px' }}>Loading products…</div>}
+                            {products.map(p => (
                                 <button
                                     key={p.id}
                                     onClick={() => addToCart(p)}
@@ -1108,12 +1138,22 @@ const NewOrderModal: React.FC<NewOrderModalProps> = ({ shiftId, roomId, roomName
                                     </div>
                                     <div style={{ padding: '10px' }}>
                                         <div style={{ fontSize: '13px', fontWeight: '600', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</div>
-                                        <div style={{ fontSize: '11px', color: 'var(--primary)', fontWeight: '700' }}>EGP {fmt(p.price)}</div>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                            <div style={{ fontSize: '11px', color: 'var(--primary)', fontWeight: '700' }}>EGP {fmt(p.price)}</div>
+                                            <div style={{ fontSize: '10px', color: p.stockQty < 5 ? 'var(--danger)' : 'var(--text-muted)' }}>Stock: {p.stockQty}</div>
+                                        </div>
                                     </div>
                                 </button>
                             ))}
-                            {!loading && filtered.length === 0 && (
+                            {!loading && products.length === 0 && (
                                 <div style={{ color: 'var(--text-muted)', fontSize: '13px', gridColumn: '1/-1', textAlign: 'center', paddingTop: '30px' }}>No products found</div>
+                            )}
+                            {page < totalPages && (
+                                <div style={{ gridColumn: '1/-1', display: 'flex', justifyContent: 'center', padding: '10px' }}>
+                                    <Button variant="secondary" onClick={() => void loadProducts(true)} loading={loadingMore} style={{ fontSize: '12px' }}>
+                                        Load More
+                                    </Button>
+                                </div>
                             )}
                         </div>
                     </div>

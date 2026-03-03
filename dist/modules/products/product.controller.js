@@ -32,18 +32,26 @@ const createCategory = async (req, res) => {
 };
 exports.createCategory = createCategory;
 const getProducts = async (req, res) => {
-    const { page, pageSize } = req.query;
+    const { page, pageSize, search, categoryId } = req.query;
     try {
         const pageNum = parseInt(page) || 1;
         const limit = parseInt(pageSize) || 50;
+        const where = {};
+        if (search) {
+            where.name = { contains: search, mode: 'insensitive' };
+        }
+        if (categoryId) {
+            where.categoryId = categoryId;
+        }
         const [products, total] = await Promise.all([
             prisma_service_1.prisma.product.findMany({
+                where,
                 include: { category: true },
                 skip: (pageNum - 1) * limit,
                 take: limit,
                 orderBy: { name: 'asc' }
             }),
-            prisma_service_1.prisma.product.count(),
+            prisma_service_1.prisma.product.count({ where }),
         ]);
         const resProducts = await Promise.all(products.map(async (p) => ({
             ...p,

@@ -50,10 +50,12 @@ export const adminService = {
     deleteRoom: (id: string) => api.delete(`/rooms/${id}`),
 
     // Products & Categories
-    getProducts: (opts?: { page?: number; pageSize?: number }) => {
+    getProducts: (opts?: { page?: number; pageSize?: number; search?: string; categoryId?: string }) => {
         const params = new URLSearchParams();
         if (opts?.page !== undefined) params.append('page', String(opts.page));
         if (opts?.pageSize !== undefined) params.append('pageSize', String(opts.pageSize));
+        if (opts?.search) params.append('search', opts.search);
+        if (opts?.categoryId) params.append('categoryId', opts.categoryId);
         const q = params.toString();
         return api.get<{ data: Product[]; total: number; page: number; pageSize: number; totalPages: number }>(`/products${q ? `?${q}` : ''}`);
     },
