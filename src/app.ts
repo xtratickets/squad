@@ -61,20 +61,27 @@ app.get('/health', (req, res) => {
 });
 
 // Serve static assets in production
-const isProd = process.env.NODE_ENV === 'production' || process.env.PORT !== '3001';
-logger.info({ nodeEnv: process.env.NODE_ENV, isProd }, 'Environment check for static serving');
+const staticPath = path.join(__dirname, '../frontend/dist');
+const indexHtmlPath = path.join(staticPath, 'index.html');
+const indexExists = fs.existsSync(indexHtmlPath);
 
-if (isProd) {
-    const staticPath = path.join(__dirname, '../frontend/dist');
-    logger.info({ staticPath, exists: fs.existsSync(staticPath) }, 'Serving static files');
+console.log('--- Static Serving Debug ---');
+console.log('NODE_ENV:', process.env.NODE_ENV);
+console.log('Static Path:', staticPath);
+console.log('Index HTML Exists:', indexExists);
+console.log('---------------------------');
 
+if (indexExists) {
+    logger.info({ staticPath }, 'Serving frontend static files');
     app.use(express.static(staticPath));
 
     app.get('*', (req, res) => {
         // Skip API routes
         if (req.url.startsWith('/api')) return res.status(404).json({ error: 'Not found' });
-        res.sendFile(path.join(__dirname, '../frontend/dist/index.html'));
+        res.sendFile(indexHtmlPath);
     });
+} else {
+    logger.warn({ staticPath }, 'Frontend build (index.html) not found. Serving API only.');
 }
 
 // Error handling
