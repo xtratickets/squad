@@ -1,11 +1,13 @@
+providers = ["node"]
+
 [phases.setup]
-nixPkgs = ["nodejs", "openssl"]
+nixPkgs = ["nodejs_22", "openssl"]
 
 [phases.install]
-cmds = ["npm ci", "npm run ci:frontend"]
+cmds = ["npm ci --omit=dev --ignore-scripts", "npm run ci:frontend"]
 
 [phases.build]
-cmds = ["npm run build:frontend", "npx prisma generate", "rm -rf dist && npx tsc"]
+cmds = ["npx prisma generate", "npm run build:frontend", "rm -rf dist && npx tsc"]
 
 [start]
 cmd = "npx prisma migrate resolve --rolled-back 20260220123408_init && npx prisma migrate deploy && npm run start:all"
