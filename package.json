@@ -64,8 +64,8 @@
     "wait-on": "^9.0.4"
   },
   "build": {
-    "appId": "com.squad.pos",
-    "productName": "SQUAD POS",
+    "appId": "com.xtratickets.squad",
+    "productName": "SQUAD ",
     "directories": {
       "output": "dist-app"
     },
