@@ -5,7 +5,7 @@ nixPkgs = ["nodejs_22", "openssl"]
 
 [phases.install]
 cmds = [
-  "npm install --no-optional --ignore-scripts",
+  "npm install --omit=optional --ignore-scripts",
   "cd frontend && npm install --ignore-scripts"
 ]
 
