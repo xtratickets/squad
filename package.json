@@ -3,10 +3,6 @@
   "version": "1.0.0",
   "description": "",
   "main": "dist/main.js",
-  "directories": {
-    "test": "tests",
-    "main": "dist/main.js"
-  },
   "scripts": {
     "build": "npm run build:frontend && tsc",
     "start": "node dist/server.js",

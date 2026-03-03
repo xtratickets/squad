@@ -99,7 +99,7 @@ if (indexExists) {
     logger.info({ staticPath }, 'Serving frontend static files');
     app.use(express.static(staticPath));
 
-    app.get('*', (req, res) => {
+    app.get('(.*)', (req, res) => {
         if (req.url.startsWith('/api')) {
             logger.warn({ method: req.method, url: req.url }, 'API route not found (falling to catch-all)');
             return res.status(404).json({ error: `API route not found: ${req.method} ${req.url}` });

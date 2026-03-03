@@ -4,12 +4,13 @@ providers = ["node"]
 nixPkgs = ["nodejs_22", "openssl"]
 
 [phases.install]
-# Skip heavy Electron dependencies and scripts in production
-cmds = ["npm install --omit=dev --no-optional --ignore-scripts", "cd frontend && npm install --omit=dev --ignore-scripts"]
+# Include dev dependencies so we can build (tsc, vite), but ignore scripts to skip heavy binary downloads
+cmds = ["npm install --no-optional --ignore-scripts", "cd frontend && npm install --ignore-scripts"]
 
 [phases.build]
-# Generate prisma first, then build all
-cmds = ["npx prisma generate", "rm -rf dist && npm run build"]
+# Generate prisma first, then build all. 
+# We clean both dist folders to ensure a fresh rebuild for both FE and BE.
+cmds = ["npx prisma generate", "rm -rf dist && rm -rf frontend/dist && npm run build"]
 
 [start]
 cmd = "npx prisma migrate resolve --rolled-back 20260220123408_init && npx prisma migrate deploy && npm run start:all"
