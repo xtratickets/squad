@@ -3,6 +3,7 @@ import Analytics from './Analytics';
 import UserManagement from './UserManagement';
 import RoomManagement from './RoomManagement';
 import ProductManagement from './ProductManagement';
+import ProductSales from './ProductSales';
 import ExpensesManagement from './ExpensesManagement';
 import SalaryManagement from './SalaryManagement';
 import ReservationsManagement from './ReservationsManagement';
@@ -18,7 +19,7 @@ import {
 import GlassPanel from '../../components/common/GlassPanel';
 
 type SubView =
-    | 'analytics' | 'users' | 'rooms' | 'products'
+    | 'analytics' | 'users' | 'rooms' | 'products' | 'sales'
     | 'expenses' | 'salaries' | 'reservations'
     | 'inventory' | 'transactions' | 'shifts' | 'settings' | 'promoCodes';
 
@@ -31,6 +32,7 @@ const AdminDashboard: React.FC = () => {
             case 'users': return <UserManagement />;
             case 'rooms': return <RoomManagement />;
             case 'products': return <ProductManagement />;
+            case 'sales': return <ProductSales />;
             case 'expenses': return <ExpensesManagement />;
             case 'salaries': return <SalaryManagement />;
             case 'reservations': return <ReservationsManagement />;
@@ -59,6 +61,7 @@ const AdminDashboard: React.FC = () => {
                 <AdminTab active={subView === 'users'} onClick={() => setSubView('users')} icon={<Users size={17} />} label="Users" />
                 <AdminTab active={subView === 'rooms'} onClick={() => setSubView('rooms')} icon={<Home size={17} />} label="Rooms" />
                 <AdminTab active={subView === 'products'} onClick={() => setSubView('products')} icon={<Box size={17} />} label="Products" />
+                <AdminTab active={subView === 'sales'} onClick={() => setSubView('sales')} icon={<BarChart3 size={17} />} label="Sales Report" />
                 <AdminTab active={subView === 'expenses'} onClick={() => setSubView('expenses')} icon={<CreditCard size={17} />} label="Expenses" />
                 <AdminTab active={subView === 'salaries'} onClick={() => setSubView('salaries')} icon={<Briefcase size={17} />} label="Salaries" />
                 <AdminTab active={subView === 'reservations'} onClick={() => setSubView('reservations')} icon={<Calendar size={17} />} label="Reservations" />

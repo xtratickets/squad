@@ -9,12 +9,13 @@ import ProductManagement from './Admin/ProductManagement';
 import ExpensesManagement from './Admin/ExpensesManagement';
 import SalaryManagement from './Admin/SalaryManagement';
 import ReservationsManagement from './Admin/ReservationsManagement';
+import ProductSales from './Admin/ProductSales';
 import {
     Layers, ShoppingCart, CreditCard, Calendar, Package,
-    DollarSign, Clock, Edit3, X, Check, Printer, ChevronLeft, ChevronRight
+    DollarSign, Clock, Edit3, X, Check, Printer, ChevronLeft, ChevronRight, BarChart3
 } from 'lucide-react';
 
-type Tab = 'sessions' | 'orders' | 'payments' | 'reservations' | 'products' | 'expenses' | 'shifts';
+type Tab = 'sessions' | 'orders' | 'payments' | 'reservations' | 'products' | 'expenses' | 'shifts' | 'sales';
 
 const TABS: { key: Tab; label: string; icon: React.ReactNode }[] = [
     { key: 'sessions', label: 'Sessions', icon: <Layers size={16} /> },
@@ -22,6 +23,7 @@ const TABS: { key: Tab; label: string; icon: React.ReactNode }[] = [
     { key: 'payments', label: 'Payments', icon: <CreditCard size={16} /> },
     { key: 'reservations', label: 'Reservations', icon: <Calendar size={16} /> },
     { key: 'products', label: 'Products & Stock', icon: <Package size={16} /> },
+    { key: 'sales', label: 'Product Sales', icon: <BarChart3 size={16} /> },
     { key: 'expenses', label: 'Expenses / Salaries', icon: <DollarSign size={16} /> },
     { key: 'shifts', label: 'Shifts', icon: <Clock size={16} /> },
 ];
@@ -583,6 +585,7 @@ const OperationsDashboard: React.FC = () => {
                 </div>
             );
             case 'shifts': return <ShiftsTab />;
+            case 'sales': return <ProductSales />;
         }
     };
 

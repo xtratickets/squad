@@ -6,5 +6,6 @@ const router = Router();
 
 router.get('/global', authenticate, authorize(['ADMIN']), reportController.getGlobalStats);
 router.get('/export', authenticate, authorize(['ADMIN']), reportController.exportReport);
+router.get('/product-sales', authenticate, reportController.getProductSales);
 
 export default router;
