@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SQUAD POS - EF</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --primary: #00e676;
+            --primary-dark: #00c853;
+            --bg: #0a0a0a;
+            --surface: rgba(30, 30, 30, 0.6);
+            --surface-solid: #1e1e1e;
+            --text: #f5f5f5;
+            --text-muted: #888;
+            --accent: #2979ff;
+            --danger: #ff5252;
+            --glass: rgba(255, 255, 255, 0.03);
+            --border: rgba(255, 255, 255, 0.1);
+        }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background-color: var(--bg);
+            background-image: radial-gradient(circle at 50% -20%, #1a237e 0%, transparent 50%);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Sidebar */
+        aside {
+            width: 260px;
+            background: var(--surface-solid);
+            backdrop-filter: blur(20px);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            padding: 30px 0;
+            z-index: 100;
+        }
+
+        .logo {
+            font-size: 28px;
+            font-weight: 800;
+            color: var(--primary);
+            text-align: center;
+            margin-bottom: 50px;
+            letter-spacing: 4px;
+            text-shadow: 0 0 20px rgba(0, 230, 118, 0.3);
+        }
+
+        nav ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        nav li {
+            padding: 16px 30px;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        nav li:hover {
+            color: var(--text);
+            background: rgba(255, 255, 255, 0.03);
+        }
+
+        nav li.active {
+            color: var(--primary);
+            background: linear-gradient(90deg, rgba(0, 230, 118, 0.1) 0%, transparent 100%);
+            border-left: 4px solid var(--primary);
+        }
+
+        /* Main Content */
+        main {
+            flex: 1;
+            padding: 40px;
+            overflow-y: auto;
+            position: relative;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 50px;
+        }
+
+        h1 {
+            font-size: 32px;
+            font-weight: 700;
+            margin: 0;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 25px;
+            margin-bottom: 50px;
+        }
+
+        .stat-card {
+            background: var(--surface);
+            backdrop-filter: blur(10px);
+            padding: 25px;
+            border-radius: 20px;
+            border: 1px solid var(--border);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+            transition: transform 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .stat-card h3 {
+            margin: 0;
+            font-size: 13px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .stat-card .value {
+            font-size: 28px;
+            font-weight: 700;
+            margin-top: 15px;
+            background: linear-gradient(45deg, #fff, var(--primary));
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .room-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 25px;
+        }
+
+        .room-card {
+            background: var(--surface);
+            backdrop-filter: blur(10px);
+            padding: 25px;
+            border-radius: 24px;
+            text-align: center;
+            border: 1px solid var(--border);
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .room-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            transition: 0.3s;
+        }
+
+        .room-card.available::before {
+            background: var(--primary);
+        }
+
+        .room-card.occupied::before {
+            background: var(--danger);
+        }
+
+        .room-card:hover {
+            transform: scale(1.05);
+            border-color: rgba(255, 255, 255, 0.2);
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.4);
+        }
+
+        .room-card h4 {
+            margin: 0;
+            font-size: 20px;
+            font-weight: 600;
+        }
+
+        .room-card p {
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-top: 8px;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 6px 14px;
+            border-radius: 100px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            margin-top: 15px;
+            letter-spacing: 0.5px;
+        }
+
+        .available .status-badge {
+            background: rgba(0, 230, 118, 0.1);
+            color: var(--primary);
+            border: 1px solid rgba(0, 230, 118, 0.2);
+        }
+
+        .occupied .status-badge {
+            background: rgba(255, 82, 82, 0.1);
+            color: var(--danger);
+            border: 1px solid rgba(255, 82, 82, 0.2);
+        }
+
+        /* Modern Modals */
+        .login-box {
+            background: rgba(20, 20, 20, 0.8);
+            backdrop-filter: blur(40px);
+            padding: 50px;
+            border-radius: 32px;
+            border: 1px solid var(--border);
+            box-shadow: 0 25px 100px rgba(0, 0, 0, 0.8);
+        }
+
+        input,
+        textarea {
+            width: 100%;
+            padding: 14px 18px;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--border);
+            color: white;
+            border-radius: 14px;
+            font-family: inherit;
+            transition: 0.3s;
+        }
+
+        input:focus {
+            border-color: var(--primary);
+            outline: none;
+            background: rgba(0, 0, 0, 0.5);
+        }
+
+        button {
+            padding: 14px 28px;
+            background: var(--primary);
+            color: #000;
+            border: none;
+            border-radius: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-size: 13px;
+        }
+
+        button:hover {
+            background: var(--primary-dark);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0, 230, 118, 0.3);
+        }
+
+        .modal-footer {
+            display: flex;
+            gap: 15px;
+            margin-top: 30px;
+        }
+
+        .modal-cancel {
+            background: rgba(255, 255, 255, 0.05) !important;
+            color: white !important;
+        }
+
+        .modal-cancel:hover {
+            background: rgba(255, 255, 255, 0.1) !important;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="login-overlay">
+        <div class="login-box">
+            <h2 style="text-align: center; color: var(--primary);">SQUAD LOGIN</h2>
+            <input type="text" id="username" placeholder="Username" value="admin">
+            <input type="password" id="password" placeholder="Password" value="admin123">
+            <button onclick="login()">SIGN IN</button>
+            <p id="login-error" style="color: var(--danger); font-size: 12px; text-align: center; margin-top: 15px;">
+            </p>
+        </div>
+    </div>
+
+    <aside>
+        <div class="logo">SQUAD</div>
+        <nav>
+            <ul>
+                <li class="active" onclick="showView('dashboard')">Dashboard</li>
+                <li>Rooms</li>
+                <li onclick="showView('orders')">Orders</li>
+                <li>Inventory</li>
+                <li>Shift Report</li>
+                <li>Settings</li>
+            </ul>
+        </nav>
+        <div id="shift-sidebar-status"
+            style="margin-top: auto; padding: 20px; font-size: 14px; border-top: 1px solid #333;">
+            <div style="color: #888; font-size: 12px; margin-bottom: 5px;">CURRENT SHIFT</div>
+            <div id="sidebar-shift-status" style="color: #888;">Closed</div>
+            <button id="shift-action-btn"
+                style="width: 100%; margin-top: 10px; font-size: 12px; padding: 8px; background: #333; color: white; border: none; border-radius: 4px; cursor: pointer;"
+                onclick="handleShiftAction()">Open Shift</button>
+        </div>
+    </aside>
+
+    <main>
+        <header>
+            <h1>Dashboard</h1>
+            <div style="display: flex; align-items: center; gap: 20px;">
+                <div id="user-info" style="color: var(--primary); font-weight: bold;">Not Logged In</div>
+                <button onclick="logout()"
+                    style="background: transparent; border: 1px solid #444; padding: 5px 10px; font-size: 12px; color: #888; border-radius: 4px; cursor: pointer;">Logout</button>
+            </div>
+        </header>
+
+        <section id="dashboard-view" class="view">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <h3>Occupancy</h3>
+                    <div class="value" id="occupancy-val">0/0</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Shift Revenue</h3>
+                    <div class="value" id="revenue-val">EGP0.00</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Active Load</h3>
+                    <div class="value" id="load-val">Low</div>
+                </div>
+            </div>
+
+            <h2>Real-time Rooms</h2>
+            <div class="room-grid" id="room-container">
+                <!-- Rooms injected here -->
+            </div>
+        </section>
+
+        <section id="orders-view" class="view" style="display:none; padding-bottom: 50px;">
+            <div style="display: flex; gap: 40px; height: calc(100vh - 250px);">
+                <div style="flex: 2; display: flex; flex-direction: column;">
+                    <div id="category-tabs"
+                        style="display: flex; gap: 10px; margin-bottom: 20px; overflow-x: auto; padding-bottom: 10px;">
+                    </div>
+                    <div id="product-grid" class="room-grid"
+                        style="grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));"></div>
+                </div>
+                <div
+                    style="flex: 1; background: var(--surface); border-radius: 12px; padding: 25px; display: flex; flex-direction: column; border: 1px solid #333;">
+                    <h3 style="margin-top: 0; border-bottom: 1px solid #333; padding-bottom: 15px;">New Order</h3>
+                    <div id="cart-target" style="font-size: 13px; color: var(--primary); margin-bottom: 20px;">No
+                        session selected</div>
+                    <div id="cart-items" style="flex: 1; overflow-y: auto;"></div>
+                    <div style="border-top: 1px solid #333; padding-top: 20px; margin-top: 10px;">
+                        <div
+                            style="display: flex; justify-content: space-between; font-weight: bold; font-size: 18px; margin-bottom: 20px;">
+                            <span>Total</span><span id="cart-total">EGP0.00</span>
+                        </div>
+                        <button onclick="placeOrder()"
+                            style="width: 100%; padding: 15px; background: var(--primary); color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer;">Place
+                            Order</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Action Modal -->
+        <div id="action-modal">
+            <div class="login-box" style="width: 400px;">
+                <h3 id="modal-title" style="color: var(--primary); margin-top: 0;">Room Action</h3>
+                <div id="modal-body" style="margin-bottom: 20px;"></div>
+                <div class="modal-footer">
+                    <button id="modal-confirm-btn" onclick="confirmModalAction()">Confirm</button>
+                    <button class="modal-cancel" onclick="closeModal()">Cancel</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Reconciliation Modal -->
+        <div id="reconcile-modal"
+            style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.9); display: none; align-items: center; justify-content: center; z-index: 3000;">
+            <div class="login-box" style="width: 500px;">
+                <h2 style="color: var(--primary); margin-top: 0; text-align: center;">Shift Reconciliation</h2>
+                <div id="reconcile-stats"
+                    style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 25px; padding: 15px; background: #111; border-radius: 8px;">
+                    <!-- Stats injected here -->
+                </div>
+
+                <div style="margin-bottom: 20px;">
+                    <label style="display: block; font-size: 12px; color: #888; margin-bottom: 5px;">Physical Cash Count
+                        (EGP)</label>
+                    <input type="number" id="reconcile-cash" step="0.01" style="margin-bottom: 10px;">
+
+                    <label style="display: block; font-size: 12px; color: #888; margin-bottom: 5px;">Notes /
+                        Discrepancies</label>
+                    <textarea id="reconcile-notes"
+                        style="width: 100%; height: 60px; background: #111; border: 1px solid #333; color: white; border-radius: 8px; padding: 10px; box-sizing: border-box;"></textarea>
+                </div>
+
+                <div class="modal-footer">
+                    <button onclick="submitShiftClose()" style="flex: 2;">Finalize & Close Shift</button>
+                    <button class="modal-cancel" onclick="closeReconcile()" style="flex: 1;">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="http://localhost:3000/socket.io/socket.io.js"></script>
+    <script>
+        let token = localStorage.getItem('squad_token');
+        let currentUser = JSON.parse(localStorage.getItem('squad_user') || 'null');
+        let currentShift = JSON.parse(localStorage.getItem('squad_shift') || 'null');
+        let selectedRoom = null;
+        let selectedAction = null;
+        let socket = null;
+
+        let cart = [];
+        let products = [];
+        let categories = [];
+        let activeCategoryId = null;
+
+        if (token) {
+            document.getElementById('login-overlay').style.display = 'none';
+            initApp();
+        }
+
+        async function login() {
+            const user = document.getElementById('username').value;
+            const pass = document.getElementById('password').value;
+            const error = document.getElementById('login-error');
+
+            try {
+                const res = await fetch('http://localhost:3000/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: user, password: pass })
+                });
+                const data = await res.json();
+                if (data.token) {
+                    token = data.token;
+                    currentUser = data.user;
+                    localStorage.setItem('squad_token', token);
+                    localStorage.setItem('squad_user', JSON.stringify(currentUser));
+                    document.getElementById('login-overlay').style.display = 'none';
+                    initApp();
+                } else {
+                    error.innerText = data.error || 'Login failed';
+                }
+            } catch (err) {
+                error.innerText = 'Server offline';
+            }
+        }
+
+        function logout() {
+            localStorage.clear();
+            location.reload();
+        }
+
+        async function initApp() {
+            document.getElementById('user-info').innerText = `${currentUser.username} (${currentUser.role})`;
+            updateShiftStatus();
+            fetchRooms();
+            initSocket();
+            setInterval(fetchRooms, 30000); // Polling as fallback
+        }
+
+        function initSocket() {
+            socket = io('http://localhost:3000');
+            socket.on('room_update', fetchRooms);
+            socket.on('order_update', () => { if (activeView === 'orders') initOrderView(); fetchRooms(); });
+            socket.on('shift_update', (shift) => {
+                if (shift) {
+                    currentShift = shift;
+                    localStorage.setItem('squad_shift', JSON.stringify(shift));
+                } else {
+                    currentShift = null;
+                    localStorage.removeItem('squad_shift');
+                }
+                updateShiftStatus();
+            });
+        }
+
+        function updateShiftStatus() {
+            const sidebarStatus = document.getElementById('sidebar-shift-status');
+            const actionBtn = document.getElementById('shift-action-btn');
+
+            if (currentShift && currentShift.id) {
+                sidebarStatus.innerText = 'Active (' + currentShift.id.slice(0, 8) + ')';
+                sidebarStatus.style.color = 'var(--primary)';
+                actionBtn.innerText = 'Close Shift';
+            } else {
+                sidebarStatus.innerText = 'Closed';
+                sidebarStatus.style.color = '#888';
+                actionBtn.innerText = 'Open Shift';
+            }
+        }
+
+        async function handleShiftAction() {
+            if (currentShift && currentShift.id) {
+                try {
+                    const res = await fetch(`http://localhost:3000/api/shifts/${currentShift.id}/stats`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    const stats = await res.json();
+                    showReconcileModal(stats);
+                } catch (err) { alert('Error fetching shift stats'); }
+            } else {
+                const cash = prompt('Enter Opening Cash:', '0');
+                if (cash === null) return;
+                try {
+                    const res = await fetch('http://localhost:3000/api/shifts/open', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                        body: JSON.stringify({ openingCash: parseFloat(cash) })
+                    });
+                    const data = await res.json();
+                    if (res.ok) {
+                        currentShift = data;
+                        localStorage.setItem('squad_shift', JSON.stringify(currentShift));
+                        updateShiftStatus();
+                    } else { alert(data.error); }
+                } catch (err) { alert('Error opening shift'); }
+            }
+        }
+
+        function showReconcileModal(stats) {
+            const modal = document.getElementById('reconcile-modal');
+            const statsDiv = document.getElementById('reconcile-stats');
+            const systemCash = (stats.openingCash || 0) + (stats.cashRevenue || 0);
+
+            statsDiv.innerHTML = `
+                <div><div style="font-size:10px;color:#555;">SYSTEM CASH</div><div style="font-size:18px;">EGP${systemCash.toFixed(2)}</div></div>
+                <div><div style="font-size:10px;color:#555;">CARD REV</div><div style="font-size:18px;">EGP${(stats.cardRevenue || 0).toFixed(2)}</div></div>
+                <div><div style="font-size:10px;color:#555;">TIPS</div><div style="font-size:18px;">EGP${(stats.tipsTotal || 0).toFixed(2)}</div></div>
+                <div><div style="font-size:10px;color:#555;">TOTAL</div><div style="font-size:18px;color:var(--primary);">EGP${(stats.totalRevenue || 0).toFixed(2)}</div></div>
+            `;
+            modal.style.display = 'flex';
+        }
+
+        function closeReconcile() { document.getElementById('reconcile-modal').style.display = 'none'; }
+
+        async function submitShiftClose() {
+            const cash = document.getElementById('reconcile-cash').value;
+            if (!cash) return alert('Enter physical cash');
+            try {
+                const res = await fetch(`http://localhost:3000/api/shifts/${currentShift.id}/close`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify({ cashPhysical: parseFloat(cash) })
+                });
+                if (res.ok) {
+                    currentShift = null;
+                    localStorage.removeItem('squad_shift');
+                    updateShiftStatus();
+                    closeReconcile();
+                    alert('Shift Closed');
+                } else { alert('Failed to close'); }
+            } catch (err) { alert('Error'); }
+        }
+
+        async function fetchRooms() {
+            try {
+                const res = await fetch('http://localhost:3000/api/guest/rooms', { headers: { 'Authorization': `Bearer ${token}` } });
+                const rooms = await res.json();
+                renderRooms(rooms);
+                updateStats(rooms);
+            } catch (err) { }
+        }
+
+        function renderRooms(rooms) {
+            const container = document.getElementById('room-container');
+            container.innerHTML = rooms.map(r => `
+                <div class="room-card ${r.status}" onclick="handleRoomClick('${r.id}', '${r.status}', '${r.name}')">
+                    <h4>${r.name}</h4><p>${r.category}</p>
+                    <div class="status-badge">${r.status}</div>
+                </div>
+            `).join('');
+        }
+
+        let activeView = 'dashboard';
+        function showView(viewName) {
+            activeView = viewName;
+            document.querySelectorAll('.view').forEach(v => v.style.display = 'none');
+            document.getElementById(viewName + '-view').style.display = 'block';
+            document.querySelectorAll('nav li').forEach(li => li.classList.remove('active'));
+            event.currentTarget.classList.add('active');
+
+            if (viewName === 'orders') initOrderView();
+        }
+
+        async function initOrderView() {
+            try {
+                const [pRes, cRes] = await Promise.all([
+                    fetch('http://localhost:3000/api/products', { headers: { 'Authorization': `Bearer ${token}` } }),
+                    fetch('http://localhost:3000/api/products/categories', { headers: { 'Authorization': `Bearer ${token}` } })
+                ]);
+                products = await pRes.json();
+                categories = await cRes.json();
+                renderCategories();
+                filterProducts(categories[0]?.id);
+            } catch (err) { console.error('Order view init error:', err); }
+        }
+
+        function renderCategories() {
+            const tabs = document.getElementById('category-tabs');
+            tabs.innerHTML = categories.map(c => `
+                <div onclick="filterProducts('${c.id}')" style="padding: 8px 20px; background: ${activeCategoryId === c.id ? 'var(--primary)' : '#222'}; border-radius: 20px; cursor: pointer; white-space: nowrap;">
+                    ${c.name}
+                </div>
+            `).join('');
+        }
+
+        function filterProducts(categoryId) {
+            activeCategoryId = categoryId;
+            renderCategories();
+            const grid = document.getElementById('product-grid');
+            grid.innerHTML = products.filter(p => !categoryId || p.categoryId === categoryId).map(p => `
+                <div class="room-card available" onclick="addToCart('${p.id}')">
+                    <h4 style="font-size: 14px;">${p.name}</h4>
+                    <p>EGP${p.price.toFixed(2)}</p>
+                </div>
+            `).join('');
+        }
+
+        function addToCart(productId) {
+            const product = products.find(p => p.id === productId);
+            const existing = cart.find(item => item.productId === productId);
+            if (existing) {
+                existing.qty++;
+            } else {
+                cart.push({ productId, name: product.name, price: product.price, qty: 1 });
+            }
+            renderCart();
+        }
+
+        function renderCart() {
+            const container = document.getElementById('cart-items');
+            container.innerHTML = cart.map((item, index) => `
+                <div style="display: flex; justify-content: space-between; margin-bottom: 15px; font-size: 14px;">
+                    <div style="flex:1;">
+                        <div style="font-weight: bold;">${item.name}</div>
+                        <div style="color: #888;">EGP${item.price.toFixed(2)} x ${item.qty}</div>
+                    </div>
+                    <div style="display: flex; gap: 5px; align-items: center;">
+                        <button onclick="updateQty(${index}, -1)" style="padding: 2px 8px;">-</button>
+                        <button onclick="updateQty(${index}, 1)" style="padding: 2px 8px;">+</button>
+                    </div>
+                </div>
+            `).join('');
+
+            const total = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+            document.getElementById('cart-total').innerText = `EGP${total.toFixed(2)}`;
+        }
+
+        function updateQty(index, delta) {
+            cart[index].qty += delta;
+            if (cart[index].qty <= 0) cart.splice(index, 1);
+            renderCart();
+        }
+
+        async function placeOrder() {
+            if (cart.length === 0) return alert('Cart is empty');
+            if (!selectedRoom || selectedRoom.status !== 'occupied') return alert('Please select an occupied room/session from Dashboard first');
+
+            try {
+                const stateRes = await fetch(`http://localhost:3000/api/rooms/${selectedRoom.id}/state`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const state = await stateRes.json();
+
+                if (!state.activeSessionId) return alert('No active session found');
+
+                const res = await fetch('http://localhost:3000/api/orders', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify({
+                        sessionId: state.activeSessionId,
+                        items: cart.map(i => ({ productId: i.productId, qty: i.qty }))
+                    })
+                });
+                if (res.ok) {
+                    alert('Order Placed Successfully');
+                    cart = [];
+                    renderCart();
+                } else { const data = await res.json(); alert(data.error); }
+            } catch (err) { alert('Error placing order'); }
+        }
+
+        // Modified handleRoomClick to support "Add Order" flow
+        function handleRoomClick(id, status, name) {
+            selectedRoom = { id, status, name };
+            document.getElementById('cart-target').innerText = `Target: ${name}`;
+
+            const modal = document.getElementById('action-modal');
+            const title = document.getElementById('modal-title');
+            const body = document.getElementById('modal-body');
+
+            modal.style.display = 'flex';
+            title.innerText = `${name} - ${status.toUpperCase()}`;
+
+            if (status === 'available') {
+                selectedAction = 'start';
+                body.innerHTML = `<p>Start a new session for this room?</p>`;
+            } else {
+                selectedAction = 'room_menu';
+                body.innerHTML = `
+                    <button onclick="switchViewToOrders()" style="width: 100%; padding: 10px; margin-bottom: 10px;">Add Items / Orders</button>
+                    <button onclick="setupEndSessionUI()" style="width: 100%; padding: 10px; background: var(--danger);">End Session</button>
+                `;
+                document.getElementById('modal-confirm-btn').style.display = 'none';
+            }
+        }
+
+        function switchViewToOrders() {
+            closeModal();
+            showView('orders');
+        }
+
+        function setupEndSessionUI() {
+            selectedAction = 'end';
+            const body = document.getElementById('modal-body');
+            body.innerHTML = `
+                <p>End the current session?</p>
+                <input type="text" id="promo-code" placeholder="Promo Code (Optional)">
+                <input type="number" id="tip-amount" placeholder="Tip Amount" value="0">
+            `;
+            document.getElementById('modal-confirm-btn').style.display = 'block';
+        }
+
+        function closeModal() {
+            document.getElementById('action-modal').style.display = 'none';
+        }
+
+        async function confirmModalAction() {
+            if (selectedAction === 'start') {
+                try {
+                    const res = await fetch('http://localhost:3000/api/sessions', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                        body: JSON.stringify({ roomId: selectedRoom.id, shiftId: currentShift.id })
+                    });
+                    if (res.ok) { closeModal(); fetchRooms(); }
+                    else { const data = await res.json(); alert(data.error); }
+                } catch (err) { alert('Error starting session'); }
+            } else if (selectedAction === 'end') {
+                const promoCode = document.getElementById('promo-code').value;
+                const tip = parseFloat(document.getElementById('tip-amount').value || '0');
+
+                try {
+                    const stateRes = await fetch(`http://localhost:3000/api/rooms/${selectedRoom.id}/state`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    const state = await stateRes.json();
+                    if (!state.activeSessionId) return alert('No active session found');
+
+                    const res = await fetch(`http://localhost:3000/api/sessions/${state.activeSessionId}/end`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                        body: JSON.stringify({ closedShiftId: currentShift.id, promoCode, tip })
+                    });
+                    const summary = await res.json();
+                    if (res.ok) {
+                        closeModal();
+                        fetchRooms();
+                        if (confirm('Session Ended. Print Receipt?')) {
+                            printSessionReceipt(summary);
+                        }
+                    } else { alert(summary.error); }
+                } catch (err) { alert('Error ending session'); }
+            }
+        }
+
+        function printSessionReceipt(summary) {
+            const receiptHtml = `
+                <div style="font-family: monospace; width: 300px; padding: 20px; border: 1px solid #000; background: white; color: black;">
+                    <h2 style="text-align: center;">SQUAD POS</h2>
+                    <p style="text-align: center;">Receipt #${summary.id.slice(0, 8)}</p>
+                    <hr>
+                    <p>Room: ${selectedRoom.name}</p>
+                    <p>Time: ${new Date().toLocaleString()}</p>
+                    <hr>
+                    <div style="display: flex; justify-content: space-between;"><span>Room Charge:</span><span>EGP${(summary.roomCharge || 0).toFixed(2)}</span></div>
+                    <div style="display: flex; justify-content: space-between;"><span>Orders Total:</span><span>EGP${(summary.ordersTotal || 0).toFixed(2)}</span></div>
+                    <div style="display: flex; justify-content: space-between;"><span>Discount:</span><span>-EGP${(summary.discountAmount || 0).toFixed(2)}</span></div>
+                    <div style="display: flex; justify-content: space-between;"><span>Tip:</span><span>EGP${(summary.tipAmount || 0).toFixed(2)}</span></div>
+                    <hr>
+                    <div style="display: flex; justify-content: space-between; font-weight: bold; font-size: 1.2em;"><span>TOTAL:</span><span>EGP${(summary.finalTotal || 0).toFixed(2)}</span></div>
+                    <hr>
+                    <p style="text-align: center;">Thank you for visiting SQUAD!</p>
+                </div>
+            `;
+            if (window.electronAPI && window.electronAPI.printReceipt) {
+                window.electronAPI.printReceipt(receiptHtml);
+            } else {
+                const win = window.open('', '_blank');
+                win.document.write(receiptHtml);
+                win.print();
+                win.close();
+            }
+        }
+
+        async function updateStats(rooms) {
+            const occupied = rooms.filter(r => r.status === 'occupied').length;
+            document.getElementById('occupancy-val').innerText = `${occupied}/${rooms.length}`;
+
+            if (currentShift) {
+                try {
+                    const res = await fetch(`http://localhost:3000/api/shifts/${currentShift.id}/stats`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    const stats = await res.json();
+                    document.getElementById('revenue-val').innerText = `EGP${stats.totalRevenue.toFixed(2)}`;
+                } catch (err) { }
+            }
+        }
+    </script>
+</body>
+
+</html>

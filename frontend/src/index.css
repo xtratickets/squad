@@ -1,0 +1,266 @@
+:root {
+  --primary: #00e676;
+  --primary-dark: #00c853;
+  --bg: #0a0a0a;
+  --surface: rgba(30, 30, 30, 0.6);
+  --surface-solid: #1e1e1e;
+  --text: #f5f5f5;
+  --text-muted: #888;
+  --accent: #2979ff;
+  --danger: #ff5252;
+  --glass: rgba(255, 255, 255, 0.03);
+  --border: rgba(255, 255, 255, 0.1);
+  --font-family: 'Outfit', 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-family);
+  background-color: var(--bg);
+  background-image: radial-gradient(circle at 50% -20%, #1a237e 0%, transparent 50%);
+  color: var(--text);
+  height: 100vh;
+  overflow: hidden;
+}
+
+#root {
+  height: 100%;
+}
+
+.glass-panel {
+  background: var(--surface);
+  backdrop-filter: blur(10px);
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+
+input,
+textarea {
+  width: 100%;
+  padding: 14px 18px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border);
+  color: white;
+  border-radius: 14px;
+  font-family: inherit;
+  transition: 0.3s;
+}
+
+input:focus {
+  border-color: var(--primary);
+  outline: none;
+  background: rgba(0, 0, 0, 0.5);
+}
+
+button {
+  padding: 14px 28px;
+  background: var(--primary);
+  color: #000;
+  border: none;
+  border-radius: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-size: 13px;
+}
+
+button:hover {
+  background: var(--primary-dark);
+  transform: translateY(-2px);
+  box-shadow: 0 10px 20px rgba(0, 230, 118, 0.3);
+}
+
+button:active {
+  transform: translateY(0);
+}
+
+button.secondary {
+  background: rgba(255, 255, 255, 0.05);
+  color: white;
+}
+
+button.secondary:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+button.danger {
+  background: var(--danger);
+  color: white;
+}
+
+button.danger:hover {
+  background: #d32f2f;
+  box-shadow: 0 10px 20px rgba(255, 82, 82, 0.3);
+}
+
+.admin-tab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  font-weight: 600;
+  font-size: 13px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  color: var(--text-muted);
+  background: transparent;
+}
+
+.admin-tab:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: white;
+}
+
+.admin-tab.active {
+  background: var(--primary);
+  color: #000;
+  box-shadow: 0 4px 15px rgba(0, 230, 118, 0.3);
+  transform: translateY(-1px);
+}
+
+.data-table-row {
+  border-bottom: 1px solid var(--border);
+  transition: background 0.2s ease;
+}
+
+.data-table-row:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+/* --- PRINT STYLES --- */
+@media print {
+
+  /* Hide dashboard elements completely */
+  .no-print,
+  button,
+  nav,
+  aside,
+  header {
+    display: none !important;
+  }
+
+  /* Reset global constraints for printing */
+  html,
+  body,
+  #root,
+  #root>div,
+  main {
+    height: auto !important;
+    min-height: auto !important;
+    overflow: visible !important;
+    display: block !important;
+    background: white !important;
+    color: black !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    position: relative !important;
+    backdrop-filter: none !important;
+    background-image: none !important;
+  }
+
+  /* Modal Backdrop Reset */
+  .no-print-bg {
+    position: relative !important;
+    display: block !important;
+    background: transparent !important;
+    padding: 0 !important;
+    backdrop-filter: none !important;
+    inset: auto !important;
+    width: 100% !important;
+    height: auto !important;
+    z-index: auto !important;
+  }
+
+  /* Receipt Area Container */
+  .receipt-print-area {
+    display: block !important;
+    width: 72mm !important; /* Slightly narrower to avoid clipping on most 80mm printers */
+    max-height: none !important;
+    height: auto !important;
+    overflow: visible !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: white !important;
+    color: #000 !important;
+    font-size: 11px !important; /* Slightly smaller for dense thermal printing */
+    font-family: 'Inter', sans-serif !important;
+    line-height: 1.2 !important;
+  }
+
+  /* Content inside the receipt modal */
+  .receipt-content {
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
+    display: block !important;
+    padding: 0 !important;
+    flex: none !important;
+  }
+
+  /* Reset GlassPanel specific styles for print */
+  .receipt-print-area * {
+    color: #000 !important;
+    background: transparent !important;
+    border-color: #000 !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+    overflow: visible !important;
+    font-weight: 500 !important;
+  }
+
+  /* Force bold for important headers and totals */
+  .receipt-print-area b, 
+  .receipt-print-area strong,
+  .receipt-print-area h2,
+  .receipt-print-area h3,
+  .receipt-print-total {
+    font-weight: 900 !important;
+  }
+
+  /* Specific divider class instead of generic selector */
+  .receipt-divider {
+    border-bottom: 1px dashed #000 !important;
+    margin: 6px 0 !important;
+    display: block !important;
+    width: 100% !important;
+    height: 1px !important;
+  }
+
+  /* Specific border-none for the container in print */
+  .receipt-summary-box {
+    border: 1px solid #000 !important;
+    border-radius: 4px !important;
+    background: transparent !important;
+    margin: 4px 0 !important;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+
+  /* Ensure rows are tight */
+  .receipt-print-area div {
+    margin-bottom: 0 !important;
+    padding-top: 2px !important;
+    padding-bottom: 2px !important;
+  }
+
+  /* Force high contrast */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}
