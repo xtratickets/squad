@@ -2,17 +2,23 @@ providers = ["node"]
 
 [phases.setup]
 nixPkgs = ["nodejs_22", "openssl"]
+aptPkgs = ["ca-certificates"]
 
 [phases.install]
+# Fast install for production: omit dev dependencies and ignore scripts
 cmds = [
-  "npm install --ignore-scripts",
-  "cd frontend && npm install --ignore-scripts"
+  "npm install --omit=dev --no-optional --ignore-scripts",
+  "cd frontend && npm install --omit=dev --ignore-scripts"
 ]
 
 [phases.build]
+# Build phase still needs tsc and vite, so we do a targeted build
+# Using npx ensures we use the version in node_modules or download on-the-fly if missing
 cmds = [
   "npx prisma generate",
-  "rm -rf dist && rm -rf frontend/dist && npm run build"
+  "rm -rf dist && rm -rf frontend/dist",
+  "cd frontend && npx vite build",
+  "npx tsc"
 ]
 
 [start]
