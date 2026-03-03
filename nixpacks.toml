@@ -7,6 +7,7 @@ nixPkgs = ["nodejs_22", "openssl"]
 # Skip heavy Electron dependencies and scripts in production
 cmds = ["npm install --omit=dev --no-optional --ignore-scripts", "cd frontend && npm install --omit=dev --ignore-scripts"]
 
+[phases.build]
 # Generate prisma first, then build all
 cmds = ["npx prisma generate", "rm -rf dist && npm run build"]
 
