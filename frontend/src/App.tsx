@@ -202,18 +202,20 @@ const App: React.FC = () => {
               </li>
             )}
             {getRoleName(user) === 'ADMIN' && (
-              <li onClick={() => setActiveView('admin')} style={navItemStyle(activeView === 'admin')}>
-                <Shield size={20} /> Admin
-              </li>
+              <>
+                <li onClick={() => setActiveView('admin')} style={navItemStyle(activeView === 'admin')}>
+                  <Shield size={20} /> Admin
+                </li>
+                <li onClick={() => setActiveView('settings')} style={navItemStyle(activeView === 'settings')}>
+                  <Settings size={20} /> Settings
+                </li>
+              </>
             )}
             {getRoleName(user) === 'OPERATION' && (
               <li onClick={() => setActiveView('operations')} style={navItemStyle(activeView === 'operations')}>
                 <Wrench size={20} /> Operations
               </li>
             )}
-            <li onClick={() => setActiveView('settings')} style={navItemStyle(activeView === 'settings')}>
-              <Settings size={20} /> Settings
-            </li>
           </ul>
         </nav>
 
