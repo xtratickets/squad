@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { User } from '../types';
+import type { User, SystemSettings } from '../types';
 import { authService } from '../services/auth.service';
 import GlassPanel from './common/GlassPanel';
 import Button from './common/Button';
@@ -7,9 +7,10 @@ import { Input } from './common/FormElements';
 
 interface LoginProps {
     onLogin: (token: string, user: User) => void;
+    systemSettings: SystemSettings;
 }
 
-const Login: React.FC<LoginProps> = ({ onLogin }) => {
+const Login: React.FC<LoginProps> = ({ onLogin, systemSettings }) => {
     const [username, setUsername] = useState('admin');
     const [password, setPassword] = useState('admin123');
     const [error, setError] = useState('');
@@ -47,9 +48,19 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
             zIndex: 1000
         }}>
             <GlassPanel style={{ padding: '60px', width: '450px' }}>
-                <h2 style={{ textAlign: 'center', color: 'var(--primary)', marginBottom: '40px', letterSpacing: '2px' }}>
-                    SQUAD LOGIN
-                </h2>
+                <div style={{ textAlign: 'center', marginBottom: '40px' }}>
+                    {systemSettings.systemLogo && (
+                        <img
+                            src={systemSettings.systemLogo}
+                            alt="Logo"
+                            style={{ width: '80px', height: '80px', objectFit: 'contain', marginBottom: '20px', borderRadius: '16px' }}
+                        />
+                    )}
+                    <h2 style={{ color: 'var(--primary)', letterSpacing: '4px', margin: 0 }}>
+                        {systemSettings.systemName.toUpperCase()}
+                    </h2>
+                    <p style={{ color: 'var(--text-muted)', fontSize: '12px', marginTop: '10px', letterSpacing: '2px' }}>MANAGEMENT SYSTEM</p>
+                </div>
                 <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                     <Input
                         label="Username"

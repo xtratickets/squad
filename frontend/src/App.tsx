@@ -64,7 +64,20 @@ const App: React.FC = () => {
   useSocket(BASE_URL, handleUpdate);
 
   useEffect(() => {
-    systemService.getSettings().then(res => setSystemSettings(res.data)).catch(console.error);
+    systemService.getSettings().then(res => {
+      setSystemSettings(res.data);
+      // Update document title and favicon
+      document.title = `${res.data.systemName.toUpperCase()} POS`;
+      if (res.data.systemLogo) {
+        let link: HTMLLinkElement | null = document.querySelector("link[rel*='icon']");
+        if (!link) {
+          link = document.createElement('link');
+          link.rel = 'shortcut icon';
+          document.getElementsByTagName('head')[0].appendChild(link);
+        }
+        link.href = res.data.systemLogo;
+      }
+    }).catch(console.error);
   }, []);
 
   // Fetch rooms and active shift on initial auth
@@ -100,17 +113,17 @@ const App: React.FC = () => {
   const isGuestRoom = window.location.hash.includes('#/room/') || window.location.pathname.includes('/room/');
 
   if (isGuestBooking) {
-    return <GuestBookingView />;
+    return <GuestBookingView systemSettings={systemSettings} />;
   }
 
   if (isGuestRoom) {
     const match = window.location.hash.match(/#\/room\/([a-zA-Z0-9-]+)/) || window.location.pathname.match(/\/room\/([a-zA-Z0-9-]+)/);
     const roomId = match ? match[1] : '';
-    if (roomId) return <GuestOrderingView roomId={roomId} />;
+    if (roomId) return <GuestOrderingView roomId={roomId} systemSettings={systemSettings} />;
   }
 
   if (!token) {
-    return <Login onLogin={handleLogin} />;
+    return <Login onLogin={handleLogin} systemSettings={systemSettings} />;
   }
 
   return (

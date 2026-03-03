@@ -3,13 +3,13 @@ import toast, { Toaster } from 'react-hot-toast';
 import GlassPanel from '../components/common/GlassPanel';
 import Button from '../components/common/Button';
 import { Clock, Plus } from 'lucide-react';
-import type { Reservation, Room } from '../types';
+import type { Reservation, Room, SystemSettings } from '../types';
 import { useSocket } from '../hooks/useSocket';
 import { BookingCalendar } from '../components/common/BookingCalendar';
 import { Input, Select } from '../components/common/FormElements';
 import { BASE_URL } from '../services/api';
 
-const GuestBookingView: React.FC = () => {
+const GuestBookingView: React.FC<{ systemSettings: SystemSettings }> = ({ systemSettings }) => {
     const [reservations, setReservations] = useState<Reservation[]>([]);
     const [rooms, setRooms] = useState<Room[]>([]);
     const [loading, setLoading] = useState(false);
@@ -117,9 +117,16 @@ const GuestBookingView: React.FC = () => {
             />
             <GlassPanel style={{ padding: '24px', flex: 1, display: 'flex', flexDirection: 'column', maxWidth: '1200px', margin: '0 auto', width: '100%' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
-                    <div>
-                        <h2 style={{ fontSize: '24px', fontWeight: '800', margin: 0, color: 'var(--primary)' }}>Book a Session</h2>
-                        <div style={{ fontSize: '14px', color: 'var(--text-muted)', marginTop: '4px' }}>Please review the calendar for availability before requesting a slot.</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                        {systemSettings.systemLogo && (
+                            <img src={systemSettings.systemLogo} alt="Logo" style={{ width: '48px', height: '48px', borderRadius: '8px', objectFit: 'contain' }} />
+                        )}
+                        <div>
+                            <h2 style={{ fontSize: '24px', fontWeight: '800', margin: 0, color: 'var(--primary)' }}>
+                                {systemSettings.systemName.toUpperCase()} - Book a Session
+                            </h2>
+                            <div style={{ fontSize: '14px', color: 'var(--text-muted)', marginTop: '4px' }}>Please review the calendar for availability before requesting a slot.</div>
+                        </div>
                     </div>
                     <div style={{ display: 'flex', gap: '10px' }}>
                         <Button variant="secondary" icon={<Clock size={16} />} onClick={() => void fetchData()}>

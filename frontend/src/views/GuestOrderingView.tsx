@@ -4,14 +4,14 @@ import GlassPanel from '../components/common/GlassPanel';
 import Button from '../components/common/Button';
 import { Search, ShoppingCart, Plus, Minus, X, PackageOpen, Coffee } from 'lucide-react';
 import { useSocket } from '../hooks/useSocket';
-import type { Category, Product, SessionOrder as Order } from '../types';
+import type { Category, Product, SessionOrder as Order, SystemSettings } from '../types';
 import { BASE_URL } from '../services/api';
 
 interface CartItem extends Product {
     cartQty: number;
 }
 
-const GuestOrderingView: React.FC<{ roomId: string }> = ({ roomId }) => {
+const GuestOrderingView: React.FC<{ roomId: string; systemSettings: SystemSettings }> = ({ roomId, systemSettings }) => {
     const [sessionData, setSessionData] = useState<any>(null); // { session: Session, room: Room }
     const [categories, setCategories] = useState<Category[]>([]);
     const [activeCat, setActiveCat] = useState<string | null>(null);
@@ -126,8 +126,12 @@ const GuestOrderingView: React.FC<{ roomId: string }> = ({ roomId }) => {
     if (!sessionData || !sessionData.session) {
         return (
             <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', color: 'var(--text)', padding: '24px', textAlign: 'center' }}>
-                <Coffee size={64} color="var(--primary)" style={{ marginBottom: '20px', opacity: 0.8 }} />
-                <h2 style={{ fontSize: '24px', fontWeight: '800', marginBottom: '10px' }}>Welcome to SQUAD</h2>
+                {systemSettings.systemLogo ? (
+                    <img src={systemSettings.systemLogo} alt="Logo" style={{ width: '80px', height: '80px', marginBottom: '20px', objectFit: 'contain', borderRadius: '16px' }} />
+                ) : (
+                    <Coffee size={64} color="var(--primary)" style={{ marginBottom: '20px', opacity: 0.8 }} />
+                )}
+                <h2 style={{ fontSize: '24px', fontWeight: '800', marginBottom: '10px' }}>Welcome to {systemSettings.systemName.toUpperCase()}</h2>
                 <p style={{ color: 'var(--text-muted)', maxWidth: '400px', lineHeight: 1.6 }}>There is currently no active session in this room. Please speak with reception to begin your session and start ordering.</p>
             </div>
         );
@@ -149,9 +153,14 @@ const GuestOrderingView: React.FC<{ roomId: string }> = ({ roomId }) => {
             {/* Header */}
             <header style={{ padding: '20px 24px', background: 'var(--surface-solid)', borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, zIndex: 10, backdropFilter: 'blur(20px)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                    <div>
-                        <h1 style={{ fontSize: '20px', fontWeight: '800', color: 'var(--primary)', margin: 0 }}>Room {room.name}</h1>
-                        <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Status: {session.status.toUpperCase()}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        {systemSettings.systemLogo && (
+                            <img src={systemSettings.systemLogo} alt="Logo" style={{ width: '40px', height: '40px', borderRadius: '8px', objectFit: 'contain' }} />
+                        )}
+                        <div>
+                            <h1 style={{ fontSize: '20px', fontWeight: '800', color: 'var(--primary)', margin: 0 }}>Room {room.name}</h1>
+                            <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{systemSettings.systemName.toUpperCase()} - {session.status.toUpperCase()}</div>
+                        </div>
                     </div>
                     {cartCount > 0 && (
                         <button

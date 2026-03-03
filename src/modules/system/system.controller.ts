@@ -2,6 +2,9 @@ import { Request, Response } from 'express';
 import { config } from '../../config/config';
 import fs from 'fs';
 import path from 'path';
+import bcrypt from 'bcryptjs';
+import { prisma } from '../../services/prisma.service';
+import { logger } from '../../utils/logger';
 
 export const getSystemSettings = (req: Request, res: Response) => {
     res.json({
@@ -13,7 +16,7 @@ export const getSystemSettings = (req: Request, res: Response) => {
 
 export const updateSystemSettings = (req: Request, res: Response) => {
     const { systemName, systemLogo } = req.body;
-    
+
     if (systemName) config.systemName = systemName;
     if (systemLogo) config.systemLogo = systemLogo;
 
@@ -22,7 +25,7 @@ export const updateSystemSettings = (req: Request, res: Response) => {
     try {
         if (fs.existsSync(envPath)) {
             let envContent = fs.readFileSync(envPath, 'utf8');
-            
+
             if (envContent.includes('SYSTEM_NAME=')) {
                 envContent = envContent.replace(/SYSTEM_NAME=.*/g, `SYSTEM_NAME="${config.systemName}"`);
             } else {
@@ -46,4 +49,76 @@ export const updateSystemSettings = (req: Request, res: Response) => {
         systemLogo: config.systemLogo,
         version: '1.0.0'
     });
+};
+
+export const seedAdmin = async (req: Request, res: Response) => {
+    try {
+        // Only allow if no users exist
+        const userCount = await prisma.user.count();
+        if (userCount > 0) {
+            return res.status(403).json({ error: 'System already has users. Seeding restricted.' });
+        }
+
+        logger.info('Starting manual system seed...');
+
+        // 1. Roles
+        const roles = ['GUEST', 'STAFF', 'OPERATION', 'ADMIN', 'OWNER'];
+        const roleMap: Record<string, any> = {};
+
+        for (const roleName of roles) {
+            roleMap[roleName] = await prisma.role.upsert({
+                where: { name: roleName },
+                update: {},
+                create: { name: roleName },
+            });
+        }
+
+        // 2. Admin User
+        const adminPassword = await bcrypt.hash('admin123', 10);
+        await prisma.user.upsert({
+            where: { username: 'admin' },
+            update: {},
+            create: {
+                username: 'admin',
+                password: adminPassword,
+                roleId: roleMap['ADMIN'].id,
+            },
+        });
+
+        // 3. Default Fee Config
+        await prisma.feeConfig.upsert({
+            where: { id: 'default' },
+            update: {},
+            create: {
+                id: 'default',
+                serviceFeePercent: 10,
+                taxPercent: 5,
+            },
+        });
+
+        // 4. Default Payment Modes
+        const paymentModes = [
+            { name: 'CASH', allowSplit: true },
+            { name: 'CARD', allowSplit: true },
+            { name: 'WALLET', allowSplit: true },
+        ];
+
+        for (const mode of paymentModes) {
+            await prisma.paymentMode.upsert({
+                where: { id: mode.name },
+                update: {},
+                create: {
+                    id: mode.name,
+                    name: mode.name,
+                    allowSplit: mode.allowSplit,
+                },
+            });
+        }
+
+        logger.info('System seed completed successfully.');
+        res.json({ message: 'System seeded successfully. Default credentials: admin / admin123' });
+    } catch (error) {
+        logger.error(error, 'Error seeding system');
+        res.status(500).json({ error: 'Internal server error during seeding' });
+    }
 };
