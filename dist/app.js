@@ -87,11 +87,12 @@ logger_1.logger.info({
     indexExists,
     cwd: process.cwd(),
     candidatePaths,
-}, 'Static serving debug info');
+}, 'Static serving debug info v4');
 if (indexExists) {
     logger_1.logger.info({ staticPath }, 'Serving frontend static files');
     app.use(express_1.default.static(staticPath));
-    app.get('*', (req, res) => {
+    // In Express 5, wildcards must be named (e.g., :path*)
+    app.get('/:path*', (req, res) => {
         if (req.url.startsWith('/api')) {
             logger_1.logger.warn({ method: req.method, url: req.url }, 'API route not found (falling to catch-all)');
             return res.status(404).json({ error: `API route not found: ${req.method} ${req.url}` });

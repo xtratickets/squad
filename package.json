@@ -5,6 +5,7 @@
   "main": "dist/main.js",
   "scripts": {
     "build": "npm run build:frontend && tsc",
+    "prebuild": "rm -rf dist",
     "start": "node dist/server.js",
     "start:prod": "NODE_ENV=production node dist/server.js",
     "start:all": "concurrently \"npm run start:prod\" \"npm run serve:frontend\"",
