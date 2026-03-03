@@ -29,4 +29,16 @@ export default defineConfig({
   },
   // Environment variable prefix
   envPrefix: 'VITE_',
+  server: {
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+      },
+      '/env-config.js': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+      }
+    }
+  }
 })

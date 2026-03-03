@@ -67,7 +67,7 @@ const App: React.FC = () => {
     systemService.getSettings().then(res => {
       setSystemSettings(res.data);
       // Update document title and favicon
-      document.title = `${res.data.systemName.toUpperCase()} POS`;
+      document.title = `${(res.data?.systemName || 'SQUAD').toUpperCase()} POS`;
       if (res.data.systemLogo) {
         let link: HTMLLinkElement | null = document.querySelector("link[rel*='icon']");
         if (!link) {
@@ -171,7 +171,7 @@ const App: React.FC = () => {
           {systemSettings.systemLogo && (
             <img src={systemSettings.systemLogo} alt="Logo" style={{ width: '60px', borderRadius: '12px' }} />
           )}
-          {systemSettings.systemName.toUpperCase()}
+          {systemSettings?.systemName?.toUpperCase() || 'SQUAD'}
         </div>
 
         <nav>
@@ -229,7 +229,7 @@ const App: React.FC = () => {
 
       <main style={{ flex: 1, padding: '40px', overflowY: 'auto' }}>
         <header className="no-print" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '40px' }}>
-          <h1 style={{ fontSize: '32px', fontWeight: '700' }}>{activeView.toUpperCase()}</h1>
+          <h1 style={{ fontSize: '32px', fontWeight: '700' }}>{activeView?.toUpperCase() || 'VIEW'}</h1>
           <div style={{ color: 'var(--primary)', fontWeight: 'bold' }}>{user?.username} ({user?.role.name})</div>
         </header>
 

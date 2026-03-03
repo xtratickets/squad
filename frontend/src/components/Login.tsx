@@ -57,7 +57,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, systemSettings }) => {
                         />
                     )}
                     <h2 style={{ color: 'var(--primary)', letterSpacing: '4px', margin: 0 }}>
-                        {systemSettings.systemName.toUpperCase()}
+                        {systemSettings?.systemName?.toUpperCase() || 'SQUAD'}
                     </h2>
                     <p style={{ color: 'var(--text-muted)', fontSize: '12px', marginTop: '10px', letterSpacing: '2px' }}>MANAGEMENT SYSTEM</p>
                 </div>
