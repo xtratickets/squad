@@ -13,8 +13,8 @@ StorageService.init();
 
 server.listen(config.port, () => {
     logger.info(
-        { port: config.port, env: config.nodeEnv, system: config.systemName },
-        'Server started successfully'
+        { port: config.port, env: config.nodeEnv, system: config.systemName, version: 'v2-debug' },
+        'Server started successfully (v2-debug)'
     );
 });
 
