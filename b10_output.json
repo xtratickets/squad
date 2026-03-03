@@ -1,0 +1,43 @@
+{
+  "promo": {
+    "id": "cdf9a4fa-6097-41a6-b76a-3c251d815f50",
+    "code": "B10",
+    "type": "percent",
+    "value": 10,
+    "active": true,
+    "expiry": "2038-12-02T00:00:00.000Z",
+    "usageLimit": null,
+    "applyTo": "room"
+  },
+  "lastCharge": {
+    "id": "672fdfce-8e27-47bb-95ce-11ac39f3cd7a",
+    "sessionId": "8fea37f5-d42d-4c62-a145-bf2c45737735",
+    "shiftId": "0820f1ea-f54b-4a21-b54f-eaae7f77705b",
+    "durationMinutes": 1,
+    "billableMinutes": 10,
+    "hourlyPrice": 100,
+    "roomAmount": 16.66666666666666,
+    "ordersAmount": 0,
+    "discount": 0,
+    "serviceFee": 0,
+    "tax": 0,
+    "tip": 1.77635683940025e-15,
+    "promoCode": "B10",
+    "finalTotal": 16.66666666666666,
+    "createdAt": "2026-03-03T01:18:35.398Z",
+    "session": {
+      "id": "8fea37f5-d42d-4c62-a145-bf2c45737735",
+      "roomId": "9e7e94ad-1cc7-4661-ad9e-830472a28484",
+      "startTime": "2026-03-03T00:41:05.117Z",
+      "endTime": "2026-03-03T01:18:35.385Z",
+      "openedShiftId": "0820f1ea-f54b-4a21-b54f-eaae7f77705b",
+      "closedShiftId": "0820f1ea-f54b-4a21-b54f-eaae7f77705b",
+      "openedById": "67441501-eff5-4f06-a638-bf058e41bd89",
+      "closedById": "67441501-eff5-4f06-a638-bf058e41bd89",
+      "status": "closed",
+      "isPaused": true,
+      "lastPausedAt": "2026-03-03T00:41:38.911Z",
+      "totalPausedMs": 0
+    }
+  }
+}
