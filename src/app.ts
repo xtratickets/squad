@@ -66,10 +66,12 @@ const indexHtmlPath = path.join(staticPath, 'index.html');
 const indexExists = fs.existsSync(indexHtmlPath);
 
 console.log('--- Static Serving Debug ---');
-console.log('NODE_ENV:', process.env.NODE_ENV);
-console.log('Static Path:', staticPath);
-console.log('Index HTML Exists:', indexExists);
-console.log('---------------------------');
+logger.info({
+    nodeEnv: process.env.NODE_ENV,
+    staticPath,
+    indexExists,
+    cwd: process.cwd()
+}, 'Static serving debug info');
 
 if (indexExists) {
     logger.info({ staticPath }, 'Serving frontend static files');
