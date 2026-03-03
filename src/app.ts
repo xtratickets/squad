@@ -46,7 +46,7 @@ app.use((req, res, next) => {
 app.use('/api/guest', guestRoutes);
 app.use('/api/system', systemRoutes);
 app.use('/api/auth', authRoutes);
-app.use('/api/rooms', roomRoutes); // rooms: GET /, GET /:id/state, GET /:id, POST /, PATCH /:id, DELETE /:id
+app.use('/api/rooms', roomRoutes);
 app.use('/api/sessions', sessionRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/orders', orderRoutes);
@@ -67,17 +67,24 @@ app.get('/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Serve static assets in production
-const staticPath = path.join(__dirname, '../frontend/dist');
+// Resolve frontend static path — tries multiple depths to handle different tsconfig outDir configs
+const candidatePaths = [
+    path.join(__dirname, '../frontend/dist'),   // if outDir = ./dist
+    path.join(__dirname, '../../frontend/dist'), // if outDir = ./dist/src
+];
+
+const staticPath = candidatePaths.find(p => fs.existsSync(path.join(p, 'index.html'))) ?? candidatePaths[0];
 const indexHtmlPath = path.join(staticPath, 'index.html');
 const indexExists = fs.existsSync(indexHtmlPath);
 
 console.log('--- Static Serving Debug ---');
 logger.info({
     nodeEnv: process.env.NODE_ENV,
+    __dirname,
     staticPath,
     indexExists,
-    cwd: process.cwd()
+    cwd: process.cwd(),
+    candidatePaths,
 }, 'Static serving debug info');
 
 if (indexExists) {
@@ -85,16 +92,14 @@ if (indexExists) {
     app.use(express.static(staticPath));
 
     app.get('*', (req, res) => {
-        // Skip API routes
         if (req.url.startsWith('/api')) return res.status(404).json({ error: 'Not found' });
         res.sendFile(indexHtmlPath);
     });
 } else {
-    logger.warn({ staticPath }, 'Frontend build (index.html) not found. Serving API only.');
+    logger.warn({ staticPath, candidatePaths }, 'Frontend build (index.html) not found. Serving API only.');
 }
 
 // Error handling
 app.use(errorHandler);
 
-// Force reload
 export default app;
