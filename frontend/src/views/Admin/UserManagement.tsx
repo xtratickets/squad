@@ -156,8 +156,8 @@ const UserManagement: React.FC = () => {
                                 </>
                             ) : (
                                 <>
-                                    <Button onClick={() => startEdit(u)} size="small" variant="secondary"><Edit size={16} /></Button>
-                                    <Button onClick={() => handleDelete(u.id)} size="small" variant="secondary" style={{ color: 'var(--danger)' }}><Trash2 size={16} /></Button>
+                                    <Button onClick={() => startEdit(u)} size="small" variant="secondary"><Edit size={16} strokeWidth={2.5} /></Button>
+                                    <Button onClick={() => handleDelete(u.id)} size="small" variant="secondary" style={{ color: 'var(--danger)' }}><Trash2 size={16} strokeWidth={2.5} /></Button>
                                 </>
                             )}
                         </div>

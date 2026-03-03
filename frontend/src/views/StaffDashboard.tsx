@@ -211,7 +211,7 @@ const WebcamModal: React.FC<{ onCapture: (key: string, url: string) => void; onC
                         style={{ width: '100%', maxHeight: '400px', objectFit: 'contain' }}
                     />
                 </div>
-                <Button loading={capturing} onClick={() => void capture()} icon={<Camera size={18} />}>
+                <Button loading={capturing} onClick={() => void capture()} icon={<Camera size={18} strokeWidth={2.5} />}>
                     Capture & Upload
                 </Button>
             </GlassPanel>
@@ -736,7 +736,7 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ sessionId, roomName, shiftI
                                 </Button>
                             </>
                         )}
-                        <Button variant="secondary" style={{ flex: 1, padding: '12px' }} icon={<Printer size={16} />} onClick={() => window.print()}>
+                        <Button variant="secondary" style={{ flex: 1, padding: '12px' }} icon={<Printer size={18} strokeWidth={2.5} />} onClick={() => window.print()}>
                             Print Receipt
                         </Button>
                         <Button variant="secondary" style={{ flex: 1, padding: '12px' }} icon={<XCircle size={16} />} onClick={onClose}>
@@ -822,7 +822,7 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ sessionId, roomName, shiftI
                                         </div>
                                         {modes.find(m => m.id === payment.modeId)?.name.match(/visa|instapay/i) && (
                                             <button type="button" onClick={() => setActiveWebcamPaymentId(payment.id)} title={payment.receiptUrl ? "Receipt captured" : "Capture receipt photo"} style={{ background: payment.receiptUrl ? 'rgba(0,230,118,0.1)' : 'rgba(255,255,255,0.06)', border: `1px solid ${payment.receiptUrl ? 'rgba(0,230,118,0.3)' : 'var(--border)'}`, color: payment.receiptUrl ? 'var(--primary)' : 'var(--text-muted)', borderRadius: '10px', width: '42px', height: '42.5px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                                                <Camera size={16} />
+                                                <Camera size={18} strokeWidth={2.5} />
                                             </button>
                                         )}
                                         {payments.length > 1 && (
@@ -1219,7 +1219,7 @@ const NewOrderModal: React.FC<NewOrderModalProps> = ({ shiftId, roomId, roomName
                                             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
                                                 <span style={{ fontSize: '13px', fontWeight: '600' }}>{item.name}</span>
                                                 <button onClick={() => removeFromCart(item.productId)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: 0 }}>
-                                                    <Trash2 size={13} />
+                                                    <Trash2 size={16} strokeWidth={2.5} />
                                                 </button>
                                             </div>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -1433,7 +1433,7 @@ const OrdersPanel: React.FC<OrdersPanelProps> = ({
                                             onClick={() => void handleAction(order.id, 'approve')}
                                             style={{ flex: 1, padding: '7px', borderRadius: '8px', background: 'rgba(0,230,118,0.12)', border: '1px solid var(--primary)', color: 'var(--primary)', cursor: 'pointer', fontWeight: '700', fontSize: '12px' }}
                                         >
-                                            <CheckCircle size={13} style={{ verticalAlign: 'middle', marginRight: 4 }} />
+                                            <CheckCircle size={16} strokeWidth={2.5} style={{ verticalAlign: 'middle', marginRight: 4 }} />
                                             Approve
                                         </button>
                                         <button
@@ -1441,7 +1441,7 @@ const OrdersPanel: React.FC<OrdersPanelProps> = ({
                                             onClick={() => void handleAction(order.id, 'cancel')}
                                             style={{ flex: 1, padding: '7px', borderRadius: '8px', background: 'rgba(255,82,82,0.08)', border: '1px solid var(--danger)', color: 'var(--danger)', cursor: 'pointer', fontWeight: '700', fontSize: '12px' }}
                                         >
-                                            <XCircle size={13} style={{ verticalAlign: 'middle', marginRight: 4 }} />
+                                            <XCircle size={16} strokeWidth={2.5} style={{ verticalAlign: 'middle', marginRight: 4 }} />
                                             Cancel
                                         </button>
                                     </div>

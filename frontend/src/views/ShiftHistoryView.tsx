@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import GlassPanel from '../components/common/GlassPanel';
 import { adminService } from '../services/admin.service';
-import { History, Calendar, Clock, ChevronDown, ChevronUp, Coffee, ReceiptText, Printer, X, Edit3, Check } from 'lucide-react';
+import { History, Calendar, Clock, ChevronDown, ChevronUp, Coffee, ReceiptText, Printer, X, Edit, Check } from 'lucide-react';
 import type { Shift, User, SessionDetail, SessionOrder } from '../types';
 import api from '../services/api';
 import toast from 'react-hot-toast';
@@ -73,13 +73,13 @@ const PaymentsEditor: React.FC<PaymentsEditorProps> = ({ payments, onUpdated }) 
                                     disabled={saving}
                                     style={{ background: 'rgba(0,230,118,0.15)', border: '1px solid var(--primary)', color: 'var(--primary)', borderRadius: '6px', padding: '3px 8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px' }}
                                 >
-                                    <Check size={12} /> Save
+                                    <Check size={14} strokeWidth={2.5} /> Save
                                 </button>
                                 <button
                                     onClick={() => setEditingId(null)}
                                     style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '3px' }}
                                 >
-                                    <X size={14} />
+                                    <X size={16} strokeWidth={2.5} />
                                 </button>
                             </>
                         ) : (
@@ -97,7 +97,7 @@ const PaymentsEditor: React.FC<PaymentsEditorProps> = ({ payments, onUpdated }) 
                                     onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
                                     onMouseLeave={e => (e.currentTarget.style.opacity = '0.6')}
                                 >
-                                    <Edit3 size={13} />
+                                    <Edit size={16} strokeWidth={2.5} />
                                 </button>
                             </>
                         )}
@@ -256,7 +256,7 @@ const ShiftHistoryView: React.FC<ShiftHistoryViewProps> = ({ user }) => {
                                                                 color: 'var(--text)', padding: '8px', borderRadius: '8px', cursor: 'pointer',
                                                                 display: 'flex', alignItems: 'center', justifyContent: 'center'
                                                             }}>
-                                                            <Printer size={18} />
+                                                            <Printer size={18} strokeWidth={2.5} />
                                                         </button>
                                                     )}
                                                 </div>

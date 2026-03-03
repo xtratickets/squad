@@ -301,7 +301,7 @@ const ProductManagement: React.FC = () => {
                             }}>
                                 {cat.name}
                                 <button onClick={() => handleDeleteCategory(cat.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '0', display: 'flex', lineHeight: 1 }}>
-                                    <X size={14} />
+                                    <Trash2 size={14} strokeWidth={2.5} />
                                 </button>
                             </div>
                         ))}
@@ -329,7 +329,7 @@ const ProductManagement: React.FC = () => {
                                     <img src={imagePreview} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="Preview" />
                                 ) : (
                                     <>
-                                        <Upload size={24} color="var(--text-muted)" />
+                                        <Upload size={24} strokeWidth={2.5} color="var(--text-muted)" />
                                         <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '8px' }}>Click to upload</span>
                                     </>
                                 )}
@@ -397,10 +397,10 @@ const ProductManagement: React.FC = () => {
                             ) : (
                                 <>
                                     <Button onClick={() => { setStockTarget(p.id); setStockForm({ qty: 0, type: 'restock', reference: '' }); }} size="small" variant="secondary" title="Add Stock">
-                                        <PackagePlus size={15} />
+                                        <PackagePlus size={16} strokeWidth={2.5} />
                                     </Button>
-                                    <Button onClick={() => startEdit(p)} size="small" variant="secondary"><Edit size={16} /></Button>
-                                    <Button onClick={() => handleDelete(p.id)} size="small" variant="secondary" style={{ color: 'var(--danger)' }}><Trash2 size={16} /></Button>
+                                    <Button onClick={() => startEdit(p)} size="small" variant="secondary"><Edit size={16} strokeWidth={2.5} /></Button>
+                                    <Button onClick={() => handleDelete(p.id)} size="small" variant="secondary" style={{ color: 'var(--danger)' }}><Trash2 size={16} strokeWidth={2.5} /></Button>
                                 </>
                             )}
                         </div>

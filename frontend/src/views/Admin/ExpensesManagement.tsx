@@ -181,7 +181,7 @@ const ExpensesManagement: React.FC = () => {
                 searchPlaceholder="Search expenses..."
                 actions={(exp: Expense) => (
                     <Button onClick={() => handleDelete(exp.id)} size="small" variant="secondary" style={{ color: 'var(--danger)' }}>
-                        <Trash2 size={16} />
+                        <Trash2 size={16} strokeWidth={2.5} />
                     </Button>
                 )}
             />
