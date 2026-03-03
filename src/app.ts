@@ -100,7 +100,10 @@ if (indexExists) {
     app.use(express.static(staticPath));
 
     app.get('*', (req, res) => {
-        if (req.url.startsWith('/api')) return res.status(404).json({ error: 'Not found' });
+        if (req.url.startsWith('/api')) {
+            logger.warn({ method: req.method, url: req.url }, 'API route not found (falling to catch-all)');
+            return res.status(404).json({ error: `API route not found: ${req.method} ${req.url}` });
+        }
         res.sendFile(indexHtmlPath);
     });
 } else {
