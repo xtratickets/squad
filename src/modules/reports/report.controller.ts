@@ -17,16 +17,38 @@ export const getGlobalStats = async (req: Request, res: Response) => {
             _sum: { amount: true },
         });
 
+        const revenueBySource = await prisma.payment.groupBy({
+            by: ['referenceType'],
+            _sum: { amount: true },
+        });
+
         const activeRooms = await prisma.room.count({
             where: { status: 'occupied' },
         });
+
+        const [totalSessionCharges, totalOrderCharges] = await Promise.all([
+            prisma.sessionCharge.aggregate({
+                _sum: { serviceFee: true, tax: true, discount: true }
+            }),
+            prisma.orderCharge.aggregate({
+                _sum: { serviceFee: true, tax: true, discount: true }
+            })
+        ]);
+
+        const totalServiceFees = (totalSessionCharges._sum.serviceFee || 0) + (totalOrderCharges._sum.serviceFee || 0);
+        const totalTax = (totalSessionCharges._sum.tax || 0) + (totalOrderCharges._sum.tax || 0);
+        const totalDiscounts = (totalSessionCharges._sum.discount || 0) + (totalOrderCharges._sum.discount || 0);
 
         res.json({
             totalSessions,
             totalOrders,
             totalRevenue: totalRevenueResult._sum.amount || 0,
             revenueByMode,
+            revenueBySource,
             activeRooms,
+            totalServiceFees,
+            totalTax,
+            totalDiscounts,
         });
     } catch (error) {
         logger.error(error, 'Error fetching global reports');

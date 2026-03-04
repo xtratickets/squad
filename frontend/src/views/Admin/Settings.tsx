@@ -190,17 +190,42 @@ const Settings: React.FC = () => {
                     </h3>
                     {feeConfig && (
                         <form onSubmit={handleUpdateFees} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                            <Input
-                                label="SERVICE FEE (%)"
-                                type="number"
-                                value={feeConfig.serviceFeePercent}
-                                onChange={e => setFeeConfig({ ...feeConfig, serviceFeePercent: parseFloat(e.target.value) })}
-                            />
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                                <Input
+                                    label="ROOM SERVICE FEE (%)"
+                                    type="number"
+                                    step="0.01"
+                                    value={feeConfig.roomServiceFeePercent}
+                                    onChange={e => setFeeConfig({ ...feeConfig, roomServiceFeePercent: parseFloat(e.target.value) || 0 })}
+                                />
+                                <Input
+                                    label="ORDER SERVICE FEE (%)"
+                                    type="number"
+                                    step="0.01"
+                                    value={feeConfig.orderServiceFeePercent}
+                                    onChange={e => setFeeConfig({ ...feeConfig, orderServiceFeePercent: parseFloat(e.target.value) || 0 })}
+                                />
+                                <Input
+                                    label="WALK-IN FEE (%)"
+                                    type="number"
+                                    step="0.01"
+                                    value={feeConfig.walkInServiceFeePercent}
+                                    onChange={e => setFeeConfig({ ...feeConfig, walkInServiceFeePercent: parseFloat(e.target.value) || 0 })}
+                                />
+                                <Input
+                                    label="OWNER FEE (%)"
+                                    type="number"
+                                    step="0.01"
+                                    value={feeConfig.ownerServiceFeePercent}
+                                    onChange={e => setFeeConfig({ ...feeConfig, ownerServiceFeePercent: parseFloat(e.target.value) || 0 })}
+                                />
+                            </div>
                             <Input
                                 label="TAX (%)"
                                 type="number"
+                                step="0.01"
                                 value={feeConfig.taxPercent}
-                                onChange={e => setFeeConfig({ ...feeConfig, taxPercent: parseFloat(e.target.value) })}
+                                onChange={e => setFeeConfig({ ...feeConfig, taxPercent: parseFloat(e.target.value) || 0 })}
                             />
                             <Button type="submit" style={{ marginTop: '10px' }}>Update Fees</Button>
                         </form>

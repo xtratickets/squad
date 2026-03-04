@@ -80,7 +80,10 @@ describe('BillingService', () => {
 
             (prisma.session.findUnique as jest.Mock).mockResolvedValue(mockSession);
             (prisma.feeConfig.findUnique as jest.Mock).mockResolvedValue({
-                serviceFeePercent: 10,
+                roomServiceFeePercent: 10,
+                orderServiceFeePercent: 10,
+                walkInServiceFeePercent: 10,
+                ownerServiceFeePercent: 0,
                 taxPercent: 10,
             });
 
@@ -112,7 +115,13 @@ describe('BillingService', () => {
             };
 
             (prisma.session.findUnique as jest.Mock).mockResolvedValue(mockSession);
-            (prisma.feeConfig.findUnique as jest.Mock).mockResolvedValue({ serviceFeePercent: 0, taxPercent: 0 });
+            (prisma.feeConfig.findUnique as jest.Mock).mockResolvedValue({
+                roomServiceFeePercent: 0,
+                orderServiceFeePercent: 0,
+                walkInServiceFeePercent: 0,
+                ownerServiceFeePercent: 0,
+                taxPercent: 0
+            });
 
             const res1 = await BillingService.computeSessionCharge(sessionId, endTime, 20);
             expect(res1.discount).toBe(20);

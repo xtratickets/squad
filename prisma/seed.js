@@ -37,7 +37,10 @@ async function main() {
         update: {},
         create: {
             id: 'default',
-            serviceFeePercent: 10,
+            roomServiceFeePercent: 10,
+            orderServiceFeePercent: 10,
+            walkInServiceFeePercent: 10,
+            ownerServiceFeePercent: 0,
             taxPercent: 5,
         },
     });
@@ -64,9 +67,9 @@ async function main() {
 }
 main()
     .catch((e) => {
-    console.error(e);
-    process.exit(1);
-})
+        console.error(e);
+        process.exit(1);
+    })
     .finally(async () => {
-    await prisma.$disconnect();
-});
+        await prisma.$disconnect();
+    });

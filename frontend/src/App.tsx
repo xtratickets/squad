@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Login from './components/Login';
-import { LayoutGrid, ShoppingCart, Settings, LogOut, Shield, Users, Calendar, History, Wrench } from 'lucide-react';
+import { LayoutGrid, ShoppingCart, Settings, LogOut, Shield, Users, Calendar, History, Wrench, Menu, X } from 'lucide-react';
 import { useSocket } from './hooks/useSocket';
 import { roomService } from './services/room.service';
 import AdminDashboard from './views/Admin/AdminDashboard';
@@ -36,6 +36,19 @@ const App: React.FC = () => {
   const [rooms, setRooms] = useState<Room[]>([]);
   const [currentShift, setCurrentShift] = useState<Shift | null>(JSON.parse(localStorage.getItem('squad_shift') || 'null'));
   const [systemSettings, setSystemSettings] = useState<SystemSettings>({ systemName: 'SQUAD', systemLogo: '', version: '1.0.0' });
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 1024);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  useEffect(() => {
+    // Close sidebar on navigation on mobile
+    if (isMobile) setSidebarOpen(false);
+  }, [activeView, isMobile]);
 
   const fetchRooms = useCallback(async () => {
     try {
@@ -101,6 +114,16 @@ const App: React.FC = () => {
     localStorage.setItem('squad_user', JSON.stringify(newUser));
     setToken(newToken);
     setUser(newUser);
+
+    // Redirect based on role
+    const role = getRoleName(newUser);
+    if (role === 'OWNER') {
+      setActiveView('owner-dashboard');
+    } else if (role === 'OPERATION') {
+      setActiveView('operations');
+    } else {
+      setActiveView('dashboard');
+    }
   };
 
   const handleLogout = () => {
@@ -154,8 +177,31 @@ const App: React.FC = () => {
         display: 'flex',
         flexDirection: 'column',
         padding: '30px 0',
-        zIndex: 100
+        zIndex: 1000,
+        position: isMobile ? 'fixed' : 'relative',
+        height: '100vh',
+        left: 0,
+        top: 0,
+        transform: isMobile && !sidebarOpen ? 'translateX(-100%)' : 'translateX(0)',
+        transition: 'transform 0.3s ease-in-out',
+        boxShadow: isMobile && sidebarOpen ? '20px 0 50px rgba(0,0,0,0.5)' : 'none',
       }}>
+        {isMobile && sidebarOpen && (
+          <button
+            onClick={() => setSidebarOpen(false)}
+            style={{
+              position: 'absolute',
+              right: '15px',
+              top: '15px',
+              background: 'none',
+              border: 'none',
+              color: 'var(--text-muted)',
+              cursor: 'pointer'
+            }}
+          >
+            <X size={24} />
+          </button>
+        )}
         <div style={{
           fontSize: '28px',
           fontWeight: '800',
@@ -230,10 +276,60 @@ const App: React.FC = () => {
         </div>
       </aside>
 
-      <main style={{ flex: 1, padding: '40px', overflowY: 'auto' }}>
-        <header className="no-print" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '40px' }}>
-          <h1 style={{ fontSize: '32px', fontWeight: '700' }}>{activeView?.toUpperCase() || 'VIEW'}</h1>
-          <div style={{ color: 'var(--primary)', fontWeight: 'bold' }}>{user?.username} ({user?.role.name})</div>
+      {isMobile && sidebarOpen && (
+        <div
+          onClick={() => setSidebarOpen(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.5)',
+            backdropFilter: 'blur(4px)',
+            zIndex: 999
+          }}
+        />
+      )}
+
+      <main style={{
+        flex: 1,
+        padding: isMobile ? '20px' : '40px',
+        overflowY: 'auto',
+        position: 'relative'
+      }}>
+        <header className="no-print" style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: isMobile ? '20px' : '40px',
+          gap: '15px'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+            {isMobile && (
+              <button
+                onClick={() => setSidebarOpen(true)}
+                style={{
+                  background: 'rgba(255,255,255,0.05)',
+                  border: '1px solid var(--border)',
+                  color: 'var(--text)',
+                  padding: '8px',
+                  borderRadius: '10px',
+                  cursor: 'pointer'
+                }}
+              >
+                <Menu size={24} />
+              </button>
+            )}
+            <h1 style={{ fontSize: isMobile ? '20px' : '32px', fontWeight: '700', margin: 0 }}>
+              {activeView?.toUpperCase().replace('-', ' ') || 'VIEW'}
+            </h1>
+          </div>
+          <div style={{
+            color: 'var(--primary)',
+            fontWeight: 'bold',
+            fontSize: isMobile ? '12px' : '14px',
+            textAlign: 'right'
+          }}>
+            {user?.username} <span style={{ opacity: 0.6, fontWeight: 'normal' }}>({user?.role.name})</span>
+          </div>
         </header>
 
         {activeView === 'dashboard' && (

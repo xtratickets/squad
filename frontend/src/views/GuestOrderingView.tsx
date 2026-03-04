@@ -21,6 +21,13 @@ const GuestOrderingView: React.FC<{ roomId: string; systemSettings: SystemSettin
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
     const [activeTab, setActiveTab] = useState<'menu' | 'orders'>('menu');
+    const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
+    useEffect(() => {
+        const handleResize = () => setIsMobile(window.innerWidth < 768);
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
 
     const fetchData = async () => {
         try {
@@ -141,7 +148,7 @@ const GuestOrderingView: React.FC<{ roomId: string; systemSettings: SystemSettin
     const orders = (session.orders || []) as Order[];
 
     return (
-        <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--bg)', color: 'var(--text)', position: 'relative' }}>
+        <div style={{ height: '100vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', background: 'var(--bg)', color: 'var(--text)', position: 'relative' }}>
             <Toaster
                 position="top-center"
                 toastOptions={{
@@ -151,50 +158,50 @@ const GuestOrderingView: React.FC<{ roomId: string; systemSettings: SystemSettin
             />
 
             {/* Header */}
-            <header style={{ padding: '20px 24px', background: 'var(--surface-solid)', borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, zIndex: 10, backdropFilter: 'blur(20px)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <header style={{ padding: isMobile ? '12px 16px' : '20px 24px', background: 'var(--surface-solid)', borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, zIndex: 10, backdropFilter: 'blur(20px)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: isMobile ? '12px' : '16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '8px' : '12px' }}>
                         {systemSettings.systemLogo && (
-                            <img src={systemSettings.systemLogo} alt="Logo" style={{ width: '40px', height: '40px', borderRadius: '8px', objectFit: 'contain' }} />
+                            <img src={systemSettings.systemLogo} alt="Logo" style={{ width: isMobile ? '32px' : '40px', height: isMobile ? '32px' : '40px', borderRadius: '8px', objectFit: 'contain' }} />
                         )}
                         <div>
-                            <h1 style={{ fontSize: '20px', fontWeight: '800', color: 'var(--primary)', margin: 0 }}>Room {room.name}</h1>
-                            <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{systemSettings.systemName.toUpperCase()} - {session.status.toUpperCase()}</div>
+                            <h1 style={{ fontSize: isMobile ? '16px' : '20px', fontWeight: '800', color: 'var(--primary)', margin: 0 }}>Room {room.name}</h1>
+                            {!isMobile && <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{systemSettings.systemName.toUpperCase()} - {session.status.toUpperCase()}</div>}
                         </div>
                     </div>
                     {cartCount > 0 && (
                         <button
                             onClick={() => setIsCartOpen(true)}
-                            style={{ background: 'var(--primary)', border: 'none', borderRadius: '50px', padding: '10px 20px', display: 'flex', gap: '8px', alignItems: 'center', color: '#000', fontWeight: '600', cursor: 'pointer', boxShadow: '0 4px 12px rgba(0, 230, 118, 0.3)' }}
+                            style={{ background: 'var(--primary)', border: 'none', borderRadius: '50px', padding: isMobile ? '8px 16px' : '10px 20px', display: 'flex', gap: '8px', alignItems: 'center', color: '#000', fontWeight: '600', cursor: 'pointer', boxShadow: '0 4px 12px rgba(0, 230, 118, 0.3)', fontSize: isMobile ? '13px' : '14px' }}
                         >
-                            <ShoppingCart size={18} />
-                            <span>{cartCount} items</span>
+                            <ShoppingCart size={isMobile ? 16 : 18} />
+                            <span>{cartCount} {isMobile ? '' : 'items'}</span>
                         </button>
                     )}
                 </div>
 
                 {/* Tabs */}
-                <div style={{ display: 'flex', gap: '20px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                <div style={{ display: 'flex', gap: isMobile ? '15px' : '20px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
                     <button
                         onClick={() => setActiveTab('menu')}
-                        style={{ background: 'none', border: 'none', color: activeTab === 'menu' ? 'var(--primary)' : 'var(--text-muted)', padding: '10px 0', fontWeight: activeTab === 'menu' ? '700' : '500', borderBottom: activeTab === 'menu' ? '2px solid var(--primary)' : '2px solid transparent', cursor: 'pointer', transition: 'all 0.2s' }}
+                        style={{ background: 'none', border: 'none', color: activeTab === 'menu' ? 'var(--primary)' : 'var(--text-muted)', padding: '10px 0', fontWeight: activeTab === 'menu' ? '700' : '500', borderBottom: activeTab === 'menu' ? '2px solid var(--primary)' : '2px solid transparent', cursor: 'pointer', transition: 'all 0.2s', fontSize: isMobile ? '14px' : '16px' }}
                     >
                         Menu
                     </button>
                     <button
                         onClick={() => setActiveTab('orders')}
-                        style={{ background: 'none', border: 'none', color: activeTab === 'orders' ? 'var(--primary)' : 'var(--text-muted)', padding: '10px 0', fontWeight: activeTab === 'orders' ? '700' : '500', borderBottom: activeTab === 'orders' ? '2px solid var(--primary)' : '2px solid transparent', cursor: 'pointer', transition: 'all 0.2s' }}
+                        style={{ background: 'none', border: 'none', color: activeTab === 'orders' ? 'var(--primary)' : 'var(--text-muted)', padding: '10px 0', fontWeight: activeTab === 'orders' ? '700' : '500', borderBottom: activeTab === 'orders' ? '2px solid var(--primary)' : '2px solid transparent', cursor: 'pointer', transition: 'all 0.2s', fontSize: isMobile ? '14px' : '16px' }}
                     >
-                        My Orders ({orders.length})
+                        {isMobile ? 'Orders' : 'My Orders'} ({orders.length})
                     </button>
                 </div>
             </header>
 
             {/* Body */}
-            <main style={{ flex: 1, overflowY: 'auto', padding: '20px', paddingBottom: '100px' }}>
+            <main style={{ flex: 1, overflowY: 'auto', padding: isMobile ? '16px' : '20px', paddingBottom: '100px' }}>
                 {activeTab === 'menu' ? (
                     <>
-                        <div style={{ marginBottom: '20px' }}>
+                        <div style={{ marginBottom: isMobile ? '16px' : '20px' }}>
                             <div style={{ position: 'relative' }}>
                                 <Search size={18} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
                                 <input
@@ -202,17 +209,17 @@ const GuestOrderingView: React.FC<{ roomId: string; systemSettings: SystemSettin
                                     placeholder="Search for drinks, snacks..."
                                     value={searchTerm}
                                     onChange={(e) => setSearchTerm(e.target.value)}
-                                    style={{ width: '100%', padding: '16px 16px 16px 44px', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', borderRadius: '12px', color: 'var(--text)', fontSize: '16px' }}
+                                    style={{ width: '100%', padding: '16px 16px 16px 44px', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', borderRadius: '12px', color: 'var(--text)', fontSize: '16px', outline: 'none' }}
                                 />
                             </div>
                         </div>
 
                         {/* Category Strip */}
                         {!searchTerm && (
-                            <div style={{ display: 'flex', overflowX: 'auto', gap: '12px', paddingBottom: '16px', marginBottom: '16px', scrollbarWidth: 'none' }}>
+                            <div style={{ display: 'flex', overflowX: 'auto', gap: '8px', paddingBottom: '16px', marginBottom: isMobile ? '8px' : '16px', scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}>
                                 <button
                                     onClick={() => setActiveCat(null)}
-                                    style={{ padding: '10px 20px', borderRadius: '30px', border: 'none', background: activeCat === null ? 'rgba(0,230,118,0.2)' : 'rgba(255,255,255,0.05)', color: activeCat === null ? 'var(--primary)' : 'var(--text)', fontWeight: activeCat === null ? '700' : '500', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                                    style={{ padding: '8px 16px', borderRadius: '30px', border: 'none', background: activeCat === null ? 'rgba(0,230,118,0.2)' : 'rgba(255,255,255,0.05)', color: activeCat === null ? 'var(--primary)' : 'var(--text)', fontWeight: activeCat === null ? '700' : '500', cursor: 'pointer', whiteSpace: 'nowrap', fontSize: '13px' }}
                                 >
                                     All
                                 </button>
@@ -220,7 +227,7 @@ const GuestOrderingView: React.FC<{ roomId: string; systemSettings: SystemSettin
                                     <button
                                         key={c.id}
                                         onClick={() => setActiveCat(c.id)}
-                                        style={{ padding: '10px 20px', borderRadius: '30px', border: 'none', background: activeCat === c.id ? 'rgba(0,230,118,0.2)' : 'rgba(255,255,255,0.05)', color: activeCat === c.id ? 'var(--primary)' : 'var(--text)', fontWeight: activeCat === c.id ? '700' : '500', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                                        style={{ padding: '8px 16px', borderRadius: '30px', border: 'none', background: activeCat === c.id ? 'rgba(0,230,118,0.2)' : 'rgba(255,255,255,0.05)', color: activeCat === c.id ? 'var(--primary)' : 'var(--text)', fontWeight: activeCat === c.id ? '700' : '500', cursor: 'pointer', whiteSpace: 'nowrap', fontSize: '13px' }}
                                     >
                                         {c.name}
                                     </button>
@@ -229,7 +236,7 @@ const GuestOrderingView: React.FC<{ roomId: string; systemSettings: SystemSettin
                         )}
 
                         {/* Product Grid */}
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '16px' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(auto-fill, minmax(150px, 1fr))', gap: isMobile ? '12px' : '16px' }}>
                             {products.length === 0 ? (
                                 <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
                                     No products found
@@ -238,7 +245,7 @@ const GuestOrderingView: React.FC<{ roomId: string; systemSettings: SystemSettin
                                 products.map(p => {
                                     const inCart = cart.find(i => i.id === p.id);
                                     return (
-                                        <div key={p.id} style={{ background: 'var(--surface-solid)', borderRadius: '16px', overflow: 'hidden', border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', position: 'relative' }}>
+                                        <div key={p.id} style={{ background: 'var(--surface-solid)', borderRadius: isMobile ? '12px' : '16px', overflow: 'hidden', border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', position: 'relative' }}>
                                             {p.imageUrl ? (
                                                 <div style={{ width: '100%', paddingTop: '100%', position: 'relative', background: '#000' }}>
                                                     <img src={p.imageUrl} alt={p.name} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -246,25 +253,25 @@ const GuestOrderingView: React.FC<{ roomId: string; systemSettings: SystemSettin
                                             ) : (
                                                 <div style={{ width: '100%', paddingTop: '100%', position: 'relative', background: 'rgba(255,255,255,0.03)' }}>
                                                     <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                                        <PackageOpen size={32} color="var(--text-muted)" opacity={0.5} />
+                                                        <PackageOpen size={isMobile ? 24 : 32} color="var(--text-muted)" opacity={0.5} />
                                                     </div>
                                                 </div>
                                             )}
 
-                                            <div style={{ padding: '16px', flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                                <div style={{ fontSize: '15px', fontWeight: '600', lineHeight: 1.3 }}>{p.name}</div>
-                                                <div style={{ color: 'var(--primary)', fontWeight: '700', fontSize: '16px', marginTop: 'auto' }}>EGP {p.price}</div>
+                                            <div style={{ padding: isMobile ? '10px' : '16px', flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                                <div style={{ fontSize: isMobile ? '13px' : '15px', fontWeight: '600', lineHeight: 1.2, height: '2.4em', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{p.name}</div>
+                                                <div style={{ color: 'var(--primary)', fontWeight: '700', fontSize: isMobile ? '14px' : '16px', marginTop: 'auto' }}>EGP {p.price}</div>
 
                                                 {inCart ? (
                                                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(0,230,118,0.1)', borderRadius: '8px', border: '1px solid rgba(0,230,118,0.3)', marginTop: '8px' }}>
-                                                        <button onClick={() => removeFromCart(p.id)} style={{ padding: '8px 12px', background: 'none', border: 'none', color: 'var(--primary)' }}><Minus size={16} /></button>
-                                                        <span style={{ fontWeight: '700', color: 'var(--primary)' }}>{inCart.cartQty}</span>
-                                                        <button onClick={() => addToCart(p)} style={{ padding: '8px 12px', background: 'none', border: 'none', color: 'var(--primary)' }}><Plus size={16} /></button>
+                                                        <button onClick={() => removeFromCart(p.id)} style={{ padding: '8px 10px', background: 'none', border: 'none', color: 'var(--primary)' }}><Minus size={14} /></button>
+                                                        <span style={{ fontWeight: '700', color: 'var(--primary)', fontSize: '13px' }}>{inCart.cartQty}</span>
+                                                        <button onClick={() => addToCart(p)} style={{ padding: '8px 10px', background: 'none', border: 'none', color: 'var(--primary)' }}><Plus size={14} /></button>
                                                     </div>
                                                 ) : (
                                                     <Button
                                                         onClick={() => addToCart(p)}
-                                                        style={{ width: '100%', padding: '10px', marginTop: '8px' }}
+                                                        style={{ width: '100%', padding: '8px', marginTop: '8px', fontSize: '13px' }}
                                                         disabled={p.stockQty <= 0}
                                                         variant={p.stockQty <= 0 ? 'secondary' : 'primary'}
                                                     >
@@ -287,23 +294,23 @@ const GuestOrderingView: React.FC<{ roomId: string; systemSettings: SystemSettin
                             </div>
                         ) : (
                             orders.map(order => (
-                                <GlassPanel key={order.id} style={{ padding: '20px' }}>
+                                <GlassPanel key={order.id} style={{ padding: isMobile ? '16px' : '20px' }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '16px' }}>
                                         <div>
                                             <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
-                                            <div style={{ fontWeight: '700', marginTop: '4px', color: order.status === 'pending' ? '#ffc400' : 'var(--primary)' }}>
+                                            <div style={{ fontWeight: '700', marginTop: '4px', color: order.status === 'pending' ? '#ffc400' : 'var(--primary)', fontSize: '13px' }}>
                                                 {order.status === 'pending' ? 'Preparing' : 'Served'}
                                             </div>
                                         </div>
-                                        <div style={{ fontWeight: '800', fontSize: '18px' }}>
+                                        <div style={{ fontWeight: '800', fontSize: isMobile ? '16px' : '18px' }}>
                                             EGP {(order.orderCharge as any)?.finalTotal ?? order.items?.reduce((sum, i) => sum + i.total, 0) ?? 0}
                                         </div>
                                     </div>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                         {order.items?.map((item: any) => (
-                                            <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
+                                            <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: isMobile ? '13px' : '14px' }}>
                                                 <div><span style={{ color: 'var(--text-muted)', marginRight: '8px' }}>{item.qty}x</span> {item.product?.name}</div>
-                                                <div>EGP {item.total}</div>
+                                                <div style={{ opacity: 0.8 }}>EGP {item.total}</div>
                                             </div>
                                         ))}
                                     </div>
@@ -317,28 +324,28 @@ const GuestOrderingView: React.FC<{ roomId: string; systemSettings: SystemSettin
             {/* Cart Modal / Drawer */}
             {isCartOpen && (
                 <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(5px)' }}>
-                    <div style={{ background: 'var(--surface)', borderTopLeftRadius: '24px', borderTopRightRadius: '24px', padding: '24px', maxHeight: '85vh', display: 'flex', flexDirection: 'column', borderTop: '1px solid var(--border)', boxShadow: '0 -10px 40px rgba(0,0,0,0.5)' }}>
+                    <div style={{ background: 'var(--surface)', borderTopLeftRadius: '24px', borderTopRightRadius: '24px', padding: isMobile ? '20px' : '24px', maxHeight: '85vh', display: 'flex', flexDirection: 'column', borderTop: '1px solid var(--border)', boxShadow: '0 -10px 40px rgba(0,0,0,0.5)' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-                            <h2 style={{ margin: 0, fontSize: '20px', fontWeight: '800' }}>Your Cart</h2>
-                            <button onClick={() => setIsCartOpen(false)} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '50px', padding: '8px', color: 'var(--text)' }}>
+                            <h2 style={{ margin: 0, fontSize: isMobile ? '18px' : '20px', fontWeight: '800' }}>Your Cart</h2>
+                            <button onClick={() => setIsCartOpen(false)} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '50px', padding: '8px', color: 'var(--text)', cursor: 'pointer' }}>
                                 <X size={20} />
                             </button>
                         </div>
 
-                        <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '16px', paddingBottom: '24px' }}>
+                        <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '12px', paddingBottom: '24px', WebkitOverflowScrolling: 'touch' }}>
                             {cart.length === 0 ? (
                                 <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '40px 0' }}>Cart is empty</div>
                             ) : (
                                 cart.map(item => (
-                                    <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '12px' }}>
-                                        <div>
-                                            <div style={{ fontWeight: '600', fontSize: '16px' }}>{item.name}</div>
-                                            <div style={{ color: 'var(--primary)', marginTop: '4px', fontWeight: '700' }}>EGP {item.price * item.cartQty}</div>
+                                    <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                        <div style={{ flex: 1 }}>
+                                            <div style={{ fontWeight: '600', fontSize: isMobile ? '14px' : '16px' }}>{item.name}</div>
+                                            <div style={{ color: 'var(--primary)', marginTop: '2px', fontWeight: '700', fontSize: '14px' }}>EGP {item.price * item.cartQty}</div>
                                         </div>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'rgba(255,255,255,0.05)', padding: '6px', borderRadius: '50px' }}>
-                                            <button onClick={() => removeFromCart(item.id)} style={{ padding: '6px', background: 'none', border: 'none', color: 'var(--text)' }}><Minus size={16} /></button>
-                                            <span style={{ fontWeight: '700', width: '20px', textAlign: 'center' }}>{item.cartQty}</span>
-                                            <button onClick={() => addToCart(item)} style={{ padding: '6px', background: 'none', border: 'none', color: 'var(--text)' }}><Plus size={16} /></button>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(255,255,255,0.05)', padding: '4px', borderRadius: '50px', marginLeft: '12px' }}>
+                                            <button onClick={() => removeFromCart(item.id)} style={{ padding: '6px', background: 'none', border: 'none', color: 'var(--text)', cursor: 'pointer' }}><Minus size={14} /></button>
+                                            <span style={{ fontWeight: '700', width: '20px', textAlign: 'center', fontSize: '13px' }}>{item.cartQty}</span>
+                                            <button onClick={() => addToCart(item)} style={{ padding: '6px', background: 'none', border: 'none', color: 'var(--text)', cursor: 'pointer' }}><Plus size={14} /></button>
                                         </div>
                                     </div>
                                 ))
@@ -346,15 +353,15 @@ const GuestOrderingView: React.FC<{ roomId: string; systemSettings: SystemSettin
                         </div>
 
                         {cart.length > 0 && (
-                            <div style={{ borderTop: '1px solid var(--border)', paddingTop: '24px', marginTop: 'auto' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px', fontSize: '20px', fontWeight: '800' }}>
+                            <div style={{ borderTop: '1px solid var(--border)', paddingTop: '20px', marginTop: 'auto' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px', fontSize: isMobile ? '18px' : '20px', fontWeight: '800' }}>
                                     <span>Total</span>
                                     <span style={{ color: 'var(--primary)' }}>EGP {cartTotal}</span>
                                 </div>
                                 <Button
                                     onClick={placeOrder}
                                     loading={submitting}
-                                    style={{ width: '100%', padding: '18px', fontSize: '18px', borderRadius: '16px' }}
+                                    style={{ width: '100%', padding: '16px', fontSize: '16px', borderRadius: '16px' }}
                                 >
                                     Place Order
                                 </Button>

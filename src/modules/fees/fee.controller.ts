@@ -15,11 +15,23 @@ export const getFeeConfig = async (req: Request, res: Response) => {
 };
 
 export const updateFeeConfig = async (req: Request, res: Response) => {
-    const { serviceFeePercent, taxPercent } = req.body;
+    const {
+        roomServiceFeePercent,
+        orderServiceFeePercent,
+        walkInServiceFeePercent,
+        ownerServiceFeePercent,
+        taxPercent
+    } = req.body;
     try {
-        const config = await prisma.feeConfig.update({
+        const config = await (prisma as any).feeConfig.update({
             where: { id: 'default' },
-            data: { serviceFeePercent, taxPercent },
+            data: {
+                roomServiceFeePercent,
+                orderServiceFeePercent,
+                walkInServiceFeePercent,
+                ownerServiceFeePercent,
+                taxPercent
+            },
         });
         res.json(config);
     } catch (error) {

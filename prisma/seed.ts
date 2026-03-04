@@ -40,7 +40,10 @@ async function main() {
         update: {},
         create: {
             id: 'default',
-            serviceFeePercent: 10,
+            roomServiceFeePercent: 10,
+            orderServiceFeePercent: 10,
+            walkInServiceFeePercent: 10,
+            ownerServiceFeePercent: 0,
             taxPercent: 5,
         },
     });

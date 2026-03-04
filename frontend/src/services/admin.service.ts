@@ -129,7 +129,7 @@ export const adminService = {
         return api.get<{ data: Shift[]; total: number; page: number; pageSize: number; totalPages: number }>(`/shifts${q ? `?${q}` : ''}`);
     },
     closeShift: (id: string, data: CloseShiftData) => api.post<Shift>(`/shifts/${id}/close`, data),
-    getShiftHistory: () => api.get<any[]>('/shifts/history'),
+    getShiftHistory: () => api.get<Shift[]>('/shifts/history'),
 
     // Analytics
     getGlobalStats: () => api.get<GlobalStats>('/reports/global'),

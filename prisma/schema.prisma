@@ -41,6 +41,7 @@ model Room {
   category       String
   pricePerHour   Float
   minMinutes     Int
+  displayOrder   Int           @default(0)
   status         String        // 'available', 'occupied', 'cleaning', 'maintenance'
   sessions       Session[]
   orders         Order[]
@@ -282,9 +283,12 @@ model PromoCode {
 }
 
 model FeeConfig {
-  id                String @id @default("default")
-  serviceFeePercent Float  @default(0)
-  taxPercent        Float  @default(0)
+  id                      String @id @default("default")
+  roomServiceFeePercent   Float  @default(0)
+  orderServiceFeePercent  Float  @default(0)
+  walkInServiceFeePercent Float  @default(0)
+  ownerServiceFeePercent  Float  @default(0)
+  taxPercent              Float  @default(0)
 }
 
 model AuditLog {

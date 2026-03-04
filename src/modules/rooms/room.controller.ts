@@ -19,7 +19,10 @@ export const listRooms = async (req: Request, res: Response) => {
                     take: 1,
                 },
             },
-            orderBy: { name: 'asc' },
+            orderBy: [
+                { displayOrder: 'asc' },
+                { name: 'asc' }
+            ],
         });
         // Flatten activeSession for convenience
         const result = rooms.map((r: any) => {
@@ -47,7 +50,10 @@ export const getRooms = async (req: Request, res: Response) => {
             prisma.room.findMany({
                 skip: (pageNum - 1) * limit,
                 take: limit,
-                orderBy: { name: 'asc' },
+                orderBy: [
+                    { displayOrder: 'asc' },
+                    { name: 'asc' }
+                ],
             }),
             prisma.room.count(),
         ]);
@@ -89,6 +95,7 @@ export const createRoom = async (req: Request, res: Response) => {
                 category,
                 pricePerHour,
                 minMinutes,
+                displayOrder: req.body.displayOrder || 0,
                 status: 'available',
             },
         });

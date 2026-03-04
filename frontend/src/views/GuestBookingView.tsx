@@ -16,6 +16,7 @@ const GuestBookingView: React.FC<{ systemSettings: SystemSettings }> = ({ system
     const [currentDate, setCurrentDate] = useState(new Date());
     const [isCreating, setIsCreating] = useState(false);
     const [submitting, setSubmitting] = useState(false);
+    const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
     const [formData, setFormData] = useState({
         roomId: '',
         startTime: '',
@@ -24,6 +25,12 @@ const GuestBookingView: React.FC<{ systemSettings: SystemSettings }> = ({ system
         guestPhone: '',
         note: ''
     });
+
+    useEffect(() => {
+        const handleResize = () => setIsMobile(window.innerWidth < 768);
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
 
     const fetchData = async () => {
         setLoading(true);
@@ -97,7 +104,7 @@ const GuestBookingView: React.FC<{ systemSettings: SystemSettings }> = ({ system
     };
 
     return (
-        <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--bg)', color: 'var(--text)', padding: '20px' }}>
+        <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--bg)', color: 'var(--text)', padding: isMobile ? '12px' : '20px', overflowY: 'auto' }}>
             <Toaster
                 position="top-right"
                 toastOptions={{
@@ -115,31 +122,31 @@ const GuestBookingView: React.FC<{ systemSettings: SystemSettings }> = ({ system
                     },
                 }}
             />
-            <GlassPanel style={{ padding: '24px', flex: 1, display: 'flex', flexDirection: 'column', maxWidth: '1200px', margin: '0 auto', width: '100%' }}>
+            <GlassPanel style={{ padding: isMobile ? '16px' : '24px', flex: 1, display: 'flex', flexDirection: 'column', maxWidth: '1200px', margin: '0 auto', width: '100%', overflow: 'auto' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '12px' : '16px' }}>
                         {systemSettings.systemLogo && (
-                            <img src={systemSettings.systemLogo} alt="Logo" style={{ width: '48px', height: '48px', borderRadius: '8px', objectFit: 'contain' }} />
+                            <img src={systemSettings.systemLogo} alt="Logo" style={{ width: isMobile ? '40px' : '48px', height: isMobile ? '40px' : '48px', borderRadius: '8px', objectFit: 'contain' }} />
                         )}
                         <div>
-                            <h2 style={{ fontSize: '24px', fontWeight: '800', margin: 0, color: 'var(--primary)' }}>
-                                {systemSettings.systemName.toUpperCase()} - Book a Session
+                            <h2 style={{ fontSize: isMobile ? '20px' : '24px', fontWeight: '800', margin: 0, color: 'var(--primary)' }}>
+                                {isMobile ? systemSettings.systemName.toUpperCase() : `${systemSettings.systemName.toUpperCase()} - Book a Session`}
                             </h2>
-                            <div style={{ fontSize: '14px', color: 'var(--text-muted)', marginTop: '4px' }}>Please review the calendar for availability before requesting a slot.</div>
+                            {!isMobile && <div style={{ fontSize: '14px', color: 'var(--text-muted)', marginTop: '4px' }}>Please review the calendar for availability before requesting a slot.</div>}
                         </div>
                     </div>
-                    <div style={{ display: 'flex', gap: '10px' }}>
-                        <Button variant="secondary" icon={<Clock size={16} />} onClick={() => void fetchData()}>
-                            Refresh
+                    <div style={{ display: 'flex', gap: '8px', width: isMobile ? '100%' : 'auto' }}>
+                        <Button variant="secondary" icon={<Clock size={16} />} onClick={() => void fetchData()} style={{ flex: isMobile ? 1 : 'none' }}>
+                            {isMobile ? 'Refresh' : 'Refresh'}
                         </Button>
-                        <Button onClick={() => setIsCreating(true)} icon={<Plus size={16} />}>
-                            Request Booking
+                        <Button onClick={() => setIsCreating(true)} icon={<Plus size={16} />} style={{ flex: isMobile ? 1 : 'none' }}>
+                            {isMobile ? 'Book Now' : 'Request Booking'}
                         </Button>
                     </div>
                 </div>
 
                 {isCreating && (
-                    <div style={{ marginBottom: '24px', padding: '24px', background: 'rgba(255,255,255,0.03)', borderRadius: '12px', border: '1px solid var(--primary)' }}>
+                    <div style={{ marginBottom: '24px', padding: isMobile ? '16px' : '24px', background: 'rgba(255,255,255,0.03)', borderRadius: '12px', border: '1px solid var(--primary)' }}>
                         <h3 style={{ marginBottom: '20px', fontSize: '18px', fontWeight: '700', color: 'var(--primary)', borderBottom: '1px solid rgba(0,230,118,0.2)', paddingBottom: '10px' }}>Reservation Details</h3>
                         <form onSubmit={handleCreate} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '20px' }}>
                             <Select
@@ -159,14 +166,14 @@ const GuestBookingView: React.FC<{ systemSettings: SystemSettings }> = ({ system
                             </div>
 
                             <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-end', gridColumn: '1 / -1', marginTop: '10px' }}>
-                                <Button loading={submitting} type="submit" style={{ flex: 1, padding: '16px' }}>Submit Booking Request</Button>
-                                <Button type="button" variant="secondary" onClick={() => setIsCreating(false)} style={{ flex: 1, padding: '16px' }}>Cancel</Button>
+                                <Button loading={submitting} type="submit" style={{ flex: 2, padding: isMobile ? '14px' : '16px' }}>Submit Request</Button>
+                                <Button type="button" variant="secondary" onClick={() => setIsCreating(false)} style={{ flex: 1, padding: isMobile ? '14px' : '16px' }}>Cancel</Button>
                             </div>
                         </form>
                     </div>
                 )}
 
-                <div style={{ flex: 1, overflowY: 'auto', background: 'rgba(0,0,0,0.2)', borderRadius: '12px', padding: '10px' }}>
+                <div style={{ flex: 1, overflowY: 'auto', background: 'rgba(0,0,0,0.2)', borderRadius: '12px', padding: isMobile ? '4px' : '10px', minHeight: '400px' }}>
                     {loading && reservations.length === 0 && rooms.length === 0 ? (
                         <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '60px' }}>Loading availability...</div>
                     ) : (

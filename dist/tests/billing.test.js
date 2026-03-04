@@ -68,7 +68,10 @@ describe('BillingService', () => {
             };
             prisma_service_1.prisma.session.findUnique.mockResolvedValue(mockSession);
             prisma_service_1.prisma.feeConfig.findUnique.mockResolvedValue({
-                serviceFeePercent: 10,
+                roomServiceFeePercent: 10,
+                orderServiceFeePercent: 10,
+                walkInServiceFeePercent: 10,
+                ownerServiceFeePercent: 0,
                 taxPercent: 10,
             });
             const result = await billing_service_1.BillingService.computeSessionCharge(sessionId, endTime);
@@ -91,7 +94,13 @@ describe('BillingService', () => {
                 orders: [],
             };
             prisma_service_1.prisma.session.findUnique.mockResolvedValue(mockSession);
-            prisma_service_1.prisma.feeConfig.findUnique.mockResolvedValue({ serviceFeePercent: 0, taxPercent: 0 });
+            prisma_service_1.prisma.feeConfig.findUnique.mockResolvedValue({
+                roomServiceFeePercent: 0,
+                orderServiceFeePercent: 0,
+                walkInServiceFeePercent: 0,
+                ownerServiceFeePercent: 0,
+                taxPercent: 0
+            });
             const res1 = await billing_service_1.BillingService.computeSessionCharge(sessionId, endTime, 20);
             expect(res1.discount).toBe(20);
             expect(res1.finalTotal).toBe(80);

@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import GlassPanel from '../components/common/GlassPanel';
+import Modal from '../components/common/Modal';
 import { adminService } from '../services/admin.service';
 import { History, Calendar, Clock, ChevronDown, ChevronUp, Coffee, ReceiptText, Printer, X, Edit, Check } from 'lucide-react';
 import type { Shift, User, SessionDetail, SessionOrder } from '../types';
 import api from '../services/api';
 import toast from 'react-hot-toast';
+import ShiftReport from '../components/common/ShiftReport';
 
 // ─── Inline Payments Editor ─────────────────────────────────────────────────
 
@@ -20,6 +22,7 @@ const PaymentsEditor: React.FC<PaymentsEditorProps> = ({ payments, onUpdated }) 
     const [saving, setSaving] = useState(false);
     // Local state so we can show updated name immediately
     const [localPayments, setLocalPayments] = useState(payments);
+    const [viewingReceipt, setViewingReceipt] = useState<string | null>(null);
 
     useEffect(() => {
         api.get('/payments/modes').then(r => setModes(r.data ?? [])).catch(() => { });
@@ -86,9 +89,13 @@ const PaymentsEditor: React.FC<PaymentsEditorProps> = ({ payments, onUpdated }) 
                             <>
                                 <span>{p.mode?.name || 'Unknown'}</span>
                                 {p.receiptUrl && (
-                                    <a href={p.receiptUrl} target="_blank" rel="noreferrer" title="View Receipt" style={{ display: 'flex', alignItems: 'center' }}>
+                                    <div
+                                        onClick={() => setViewingReceipt(p.receiptUrl)}
+                                        style={{ cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                                        title="View Receipt"
+                                    >
                                         <img src={p.receiptUrl} alt="Receipt" style={{ height: '24px', width: '24px', objectFit: 'cover', borderRadius: '4px', border: '1px solid var(--border)' }} />
-                                    </a>
+                                    </div>
                                 )}
                                 <button
                                     onClick={() => startEdit(p)}
@@ -105,6 +112,21 @@ const PaymentsEditor: React.FC<PaymentsEditorProps> = ({ payments, onUpdated }) 
                     <span style={{ fontWeight: '600' }}>{formatCurrency(p.amount)}</span>
                 </div>
             ))}
+
+            <Modal
+                isOpen={!!viewingReceipt}
+                onClose={() => setViewingReceipt(null)}
+                title="Payment Receipt"
+                maxWidth="500px"
+            >
+                {viewingReceipt && (
+                    <img
+                        src={viewingReceipt}
+                        alt="Receipt Full"
+                        style={{ width: '100%', borderRadius: '8px', display: 'block' }}
+                    />
+                )}
+            </Modal>
         </div>
     );
 };
@@ -119,13 +141,31 @@ const ShiftHistoryView: React.FC<ShiftHistoryViewProps> = ({ user }) => {
     const [shifts, setShifts] = useState<Shift[]>([]);
     const [loading, setLoading] = useState(false);
     const [expandedShifts, setExpandedShifts] = useState<Record<string, boolean>>({});
-    const [printingShift, setPrintingShift] = useState<Shift | null>(null);
     const [viewSession, setViewSession] = useState<SessionDetail | null>(null);
     const [viewOrder, setViewOrder] = useState<SessionOrder | null>(null);
+    const [printingShift, setPrintingShift] = useState<Shift | null>(null);
+    const [printingSession, setPrintingSession] = useState<SessionDetail | null>(null);
+    const [printingOrder, setPrintingOrder] = useState<SessionOrder | null>(null);
 
     const printShift = (e: React.MouseEvent, shift: Shift) => {
         e.stopPropagation(); // prevent toggleExpand
         setPrintingShift(shift);
+        setPrintingSession(null);
+        setPrintingOrder(null);
+        setTimeout(() => window.print(), 100);
+    };
+
+    const printSessionReceipt = (session: SessionDetail) => {
+        setPrintingSession(session);
+        setPrintingOrder(null);
+        setPrintingShift(null);
+        setTimeout(() => window.print(), 100);
+    };
+
+    const printOrderReceipt = (order: SessionOrder) => {
+        setPrintingOrder(order);
+        setPrintingSession(null);
+        setPrintingShift(null);
         setTimeout(() => window.print(), 100);
     };
 
@@ -185,7 +225,8 @@ const ShiftHistoryView: React.FC<ShiftHistoryViewProps> = ({ user }) => {
                         <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: '16px' }}>
                             {shifts.map(shift => {
                                 const isExpanded = !!expandedShifts[shift.id];
-                                const totalRevenue = shift.stats?.totalRevenue ?? (shift.paymentsByMode ? shift.paymentsByMode.reduce((sum, p) => sum + p.amount, 0) : ((shift.stats?.paymentsCash || 0) + (shift.stats?.paymentsCard || 0) + (shift.stats?.paymentsWallet || 0)));
+                                // Total Revenue = Sessions Revenue + Orders Revenue + Service Fees + Tax - Discounts
+
 
                                 return (
                                     <div key={shift.id} style={{
@@ -242,9 +283,13 @@ const ShiftHistoryView: React.FC<ShiftHistoryViewProps> = ({ user }) => {
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '30px' }}>
                                                 <div style={{ textAlign: 'right', display: 'flex', alignItems: 'center', gap: '16px' }}>
                                                     <div>
-                                                        <div style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '2px' }}>Total Revenue</div>
+                                                        <div style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '2px' }}>Total Payments Without Tips</div>
                                                         <div style={{ fontSize: '20px', fontWeight: '800', color: shift.status === 'open' ? 'var(--primary)' : 'var(--text)' }}>
-                                                            {formatCurrency(totalRevenue)}
+                                                            {formatCurrency(
+                                                                ((shift.paymentsByMode?.reduce((sum, p) => sum + p.amount, 0) ?? 0) ||
+                                                                    ((shift.stats?.paymentsCash || 0) + (shift.stats?.paymentsCard || 0) + (shift.stats?.paymentsWallet || 0))) -
+                                                                (shift.stats?.tipsTotal ?? 0)
+                                                            )}
                                                         </div>
                                                     </div>
                                                     {isExpanded && (
@@ -266,144 +311,12 @@ const ShiftHistoryView: React.FC<ShiftHistoryViewProps> = ({ user }) => {
 
                                         {/* Content */}
                                         {isExpanded && (
-                                            <div style={{ padding: '0 24px 24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                                                {/* Stats Grid */}
-                                                <div style={{
-                                                    display: 'grid',
-                                                    gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
-                                                    gap: '12px',
-                                                    padding: '16px',
-                                                    background: 'rgba(0,0,0,0.15)',
-                                                    borderRadius: '12px'
-                                                }}>
-                                                    {shift.paymentsByMode && shift.paymentsByMode.length > 0 ? (
-                                                        <>
-                                                            {shift.paymentsByMode.map((mode, i) => (
-                                                                <div key={mode.name}>
-                                                                    <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '4px' }}>{mode.name}</div>
-                                                                    <div style={{ fontSize: '14px', fontWeight: 'bold', color: ['#00e676', '#ffab00', '#2979ff', '#e040fb', '#18ffff'][i % 5] }}>{formatCurrency(mode.amount)}</div>
-                                                                </div>
-                                                            ))}
-                                                            <div>
-                                                                <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '4px' }}>Total Payments</div>
-                                                                <div style={{ fontSize: '14px', fontWeight: 'bold', color: 'var(--text)' }}>
-                                                                    {formatCurrency(shift.paymentsByMode.reduce((sum, p) => sum + p.amount, 0))}
-                                                                </div>
-                                                            </div>
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            <div>
-                                                                <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '4px' }}>Cash</div>
-                                                                <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#00e676' }}>{formatCurrency(shift.stats?.paymentsCash)}</div>
-                                                            </div>
-                                                            <div>
-                                                                <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '4px' }}>Card</div>
-                                                                <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#ffab00' }}>{formatCurrency(shift.stats?.paymentsCard)}</div>
-                                                            </div>
-                                                            <div>
-                                                                <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '4px' }}>Wallet</div>
-                                                                <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#2979ff' }}>{formatCurrency(shift.stats?.paymentsWallet)}</div>
-                                                            </div>
-                                                        </>
-                                                    )}
-
-                                                    {shift.stats?.expenses && shift.stats.expenses.length > 0 && (
-                                                        <>
-                                                            <div>
-                                                                <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '4px' }}>Expenses</div>
-                                                                <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#d32f2f' }}>
-                                                                    -{formatCurrency(shift.stats.expenses.reduce((s: number, e: any) => s + e.amount, 0))}
-                                                                </div>
-                                                            </div>
-                                                            <div>
-                                                                <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '4px' }}>Cash on Hand</div>
-                                                                <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#00b0ff' }}>
-                                                                    {formatCurrency(
-                                                                        (shift.paymentsByMode?.find(m => m.name.toLowerCase() === 'cash')?.amount || shift.stats?.paymentsCash || 0)
-                                                                        - shift.stats.expenses.reduce((s: number, e: any) => s + e.amount, 0)
-                                                                    )}
-                                                                </div>
-                                                            </div>
-                                                        </>
-                                                    )}
-                                                </div>
-
-                                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
-                                                    {/* Sessions */}
-                                                    <div>
-                                                        <h4 style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                            <Coffee size={14} /> Sessions ({shift.openedSessions?.length || 0})
-                                                        </h4>
-                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                                            {shift.openedSessions && shift.openedSessions.length > 0 ? (
-                                                                shift.openedSessions.map(s => (
-                                                                    <div key={s.id} onClick={() => setViewSession(s)} style={{ padding: '12px', background: 'rgba(255,255,255,0.03)', borderRadius: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', transition: 'background 0.2s' }} onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.06)'} onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.03)'}>
-                                                                        <div>
-                                                                            <div style={{ fontSize: '13px', fontWeight: '600' }}>{s.room.name}</div>
-                                                                            <div style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                                                <span>{s.status.toUpperCase()} • {formatDuration(s.startTime, s.endTime)}</span>
-                                                                                {(s.sessionCharge as any)?.discount > 0 && (
-                                                                                    <span style={{ background: 'rgba(239,68,68,0.15)', color: '#f87171', fontSize: '10px', padding: '1px 6px', borderRadius: '6px', fontWeight: 700 }}>
-                                                                                        -{formatCurrency((s.sessionCharge as any).discount)}
-                                                                                    </span>
-                                                                                )}
-                                                                                {(s.sessionCharge as any)?.promoCode && (
-                                                                                    <span style={{ background: 'rgba(139,92,246,0.15)', color: '#a78bfa', fontSize: '10px', padding: '1px 6px', borderRadius: '6px', fontWeight: 700 }}>
-                                                                                        {(s.sessionCharge as any).promoCode}
-                                                                                    </span>
-                                                                                )}
-                                                                                {(s.sessionCharge as any)?.tip > 0 && (
-                                                                                    <span style={{ background: 'rgba(0,230,118,0.12)', color: 'var(--primary)', fontSize: '10px', padding: '1px 6px', borderRadius: '6px', fontWeight: 700 }}>
-                                                                                        +{formatCurrency((s.sessionCharge as any).tip)}
-                                                                                    </span>
-                                                                                )}
-                                                                            </div>
-                                                                        </div>
-                                                                        <div style={{ textAlign: 'right' }}>
-                                                                            {(s.sessionCharge as any)?.discount > 0 && (
-                                                                                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px' }}>
-                                                                                    After Disc: {formatCurrency(((s.sessionCharge as any).itemsTotal || (s.sessionCharge as any).roomAmount + (s.sessionCharge as any).ordersAmount) - (s.sessionCharge as any).discount)}
-                                                                                </div>
-                                                                            )}
-                                                                            <div style={{ fontSize: '13px', fontWeight: 'bold', color: 'var(--primary)' }}>
-                                                                                {formatCurrency(s.sessionCharge?.finalTotal)}
-                                                                            </div>
-                                                                        </div>
-                                                                    </div>
-                                                                ))
-                                                            ) : (
-                                                                <div style={{ fontSize: '12px', color: 'var(--text-muted)', padding: '10px' }}>No sessions recorded.</div>
-                                                            )}
-                                                        </div>
-                                                    </div>
-
-                                                    {/* Standalone Orders */}
-                                                    <div>
-                                                        <h4 style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                            <ReceiptText size={14} /> Other Orders ({shift.orders?.length || 0})
-                                                        </h4>
-                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                                            {shift.orders && shift.orders.length > 0 ? (
-                                                                shift.orders.map(o => (
-                                                                    <div key={o.id} onClick={() => setViewOrder(o)} style={{ padding: '12px', background: 'rgba(255,255,255,0.03)', borderRadius: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', transition: 'background 0.2s' }} onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.06)'} onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.03)'}>
-                                                                        <div>
-                                                                            <div style={{ fontSize: '13px', fontWeight: '600' }}>{o.type === 'owner' ? 'Owner Order' : 'Walk-in Order'}</div>
-                                                                            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                                                                                {o.items?.map(i => `${i.qty}x ${i.product?.name || 'Item'}`).join(', ')}
-                                                                            </div>
-                                                                        </div>
-                                                                        <div style={{ fontSize: '13px', fontWeight: 'bold', color: 'var(--primary)' }}>
-                                                                            {formatCurrency(o.orderCharge?.finalTotal)}
-                                                                        </div>
-                                                                    </div>
-                                                                ))
-                                                            ) : (
-                                                                <div style={{ fontSize: '12px', color: 'var(--text-muted)', padding: '10px' }}>No direct orders recorded.</div>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                </div>
+                                            <div style={{ padding: '0 24px 24px' }}>
+                                                <ShiftReport
+                                                    shift={shift}
+                                                    onViewSession={setViewSession}
+                                                    onViewOrder={setViewOrder}
+                                                />
                                             </div>
                                         )}
                                     </div>
@@ -416,87 +329,149 @@ const ShiftHistoryView: React.FC<ShiftHistoryViewProps> = ({ user }) => {
 
             {/* Print Section for Shift History */}
             {printingShift && (
-                <div className="print-only receipt-print-area" style={{ display: 'none' }}>
-                    <h2 style={{ textAlign: 'center', margin: '0 0 10px 0', borderBottom: '1px dashed #000', paddingBottom: '10px', fontSize: '18px', fontWeight: '900' }}>SHIFT REPORT</h2>
-                    <div style={{ marginBottom: '15px' }}>
-                        <div><b>Date:</b> {new Date(printingShift.startTime).toLocaleDateString()}</div>
-                        <div><b>Shift ID:</b> {printingShift.id.slice(0, 8)}</div>
-                        <div><b>Started:</b> {new Date(printingShift.startTime).toLocaleTimeString()}</div>
-                        {printingShift.endTime && <div><b>Closed:</b> {new Date(printingShift.endTime).toLocaleTimeString()}</div>}
+                <ShiftReport shift={printingShift} mode="print" />
+            )}
+
+            {/* Print Section for Individual Session/Order Receipts */}
+            <style>{`
+                @media print {
+                    .no-print { display: none !important; }
+                    .print-only { display: block !important; }
+                    .receipt-print-area { box-shadow: none !important; border: none !important; background: #fff !important; color: #000 !important; width: 100% !important; max-width: 100% !important; padding: 0 !important; }
+                    .receipt-divider { border-top: 1px dashed #000 !important; margin: 10px 0; }
+                    .mono { font-family: monospace !important; font-weight: bold !important; }
+                    body { background: white !important; }
+                }
+                .receipt-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 4px; }
+            `}</style>
+
+            {(printingSession || printingOrder) && (
+                <div className="print-only receipt-print-area" style={{ display: 'none', background: '#fff', color: '#000', padding: '20px', fontFamily: 'monospace' }}>
+                    <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+                        <div style={{ fontSize: '24px', fontWeight: '900', letterSpacing: '2px', marginBottom: '4px' }}>SQUAD POS</div>
+                        <div style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '1px' }}>Official Receipt</div>
+                        <div className="receipt-divider" style={{ width: '60px', margin: '10px auto' }} />
                     </div>
 
-                    <div style={{ borderTop: '1px dashed #000', paddingTop: '10px', marginBottom: '15px' }}>
-                        <div style={{ marginBottom: '8px', fontWeight: 'bold' }}>Payments Collected:</div>
-                        {printingShift.paymentsByMode && printingShift.paymentsByMode.length > 0 ? (
-                            printingShift.paymentsByMode.map((mode: any) => (
-                                <div key={mode.name} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                                    <span>{mode.name}</span>
-                                    <span style={{ fontWeight: '600' }}>{formatCurrency(mode.amount)}</span>
-                                </div>
-                            ))
-                        ) : (
-                            <>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                                    <span>Cash</span>
-                                    <span style={{ fontWeight: '600' }}>{formatCurrency(printingShift.stats?.paymentsCash ?? 0)}</span>
-                                </div>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                                    <span>Card</span>
-                                    <span style={{ fontWeight: '600' }}>{formatCurrency(printingShift.stats?.paymentsCard ?? 0)}</span>
-                                </div>
-                            </>
-                        )}
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '6px', paddingTop: '6px', borderTop: '1px solid #000', fontWeight: 'bold' }}>
-                            <span>Total Payments</span>
-                            <span>{formatCurrency((printingShift.paymentsByMode || []).reduce((sum, m) => sum + m.amount, 0) || (printingShift.stats?.paymentsCash || 0) + (printingShift.stats?.paymentsCard || 0))}</span>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px', fontSize: '12px' }}>
+                        <div>
+                            <div>Date: {new Date().toLocaleDateString()}</div>
+                            <div>Time: {new Date().toLocaleTimeString()}</div>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                            <div>ID: {(printingSession?.id || printingOrder?.id || '').slice(0, 8)}</div>
+                            {printingSession && <div>Room: {printingSession.room.name}</div>}
                         </div>
                     </div>
 
-                    {printingShift.stats?.expenses && printingShift.stats.expenses.length > 0 && (
-                        <div style={{ borderTop: '1px dashed #000', paddingTop: '10px', marginBottom: '15px' }}>
-                            <div style={{ marginBottom: '8px', fontWeight: 'bold' }}>Expenses:</div>
-                            {printingShift.stats.expenses.map((exp: any) => (
-                                <div key={exp.id} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: '12px' }}>
-                                    <span>{exp.category} {exp.note ? `- ${exp.note}` : ''}</span>
-                                    <span style={{ fontWeight: '600' }}>-{formatCurrency(exp.amount)}</span>
+                    {printingSession && (
+                        <>
+                            <div style={{ fontSize: '10px', textTransform: 'uppercase', fontWeight: 'bold', marginBottom: '8px' }}>Room Usage</div>
+                            <div className="receipt-row">
+                                <div style={{ flex: 1 }}>
+                                    <div>{printingSession.room.name}</div>
+                                    <div style={{ fontSize: '10px', opacity: 0.8 }}>
+                                        {printingSession.sessionCharge?.billableMinutes} mins @ EGP {printingSession.sessionCharge?.hourlyPrice.toFixed(2)}/hr
+                                    </div>
+                                </div>
+                                <div className="mono">EGP {printingSession.sessionCharge?.roomAmount.toFixed(2)}</div>
+                            </div>
+                            <div className="receipt-divider" />
+                        </>
+                    )}
+
+                    {((printingSession?.orders && printingSession.orders.length > 0) || (printingOrder)) && (
+                        <div style={{ marginBottom: '20px' }}>
+                            <div style={{ fontSize: '10px', textTransform: 'uppercase', fontWeight: 'bold', marginBottom: '8px' }}>Orders</div>
+                            {(printingSession?.orders || [printingOrder]).map((order: any) => (
+                                <div key={order.id} style={{ marginBottom: '4px' }}>
+                                    {order.items?.map((item: any) => (
+                                        <div key={item.id} className="receipt-row" style={{ fontSize: '12px' }}>
+                                            <div style={{ flex: 1 }}>
+                                                <div>{item.product?.name || 'Item'}</div>
+                                                <div style={{ fontSize: '10px', opacity: 0.8 }}>{item.qty} x EGP {item.unitPrice.toFixed(2)}</div>
+                                            </div>
+                                            <div className="mono">EGP {item.total.toFixed(2)}</div>
+                                        </div>
+                                    ))}
                                 </div>
                             ))}
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '6px', paddingTop: '6px', borderTop: '1px solid #000', fontWeight: 'bold' }}>
-                                <span>Total Expenses</span>
-                                <span style={{ color: '#d32f2f' }}>-{formatCurrency(printingShift.stats.expenses.reduce((sum: number, e: any) => sum + e.amount, 0))}</span>
-                            </div>
+                            <div className="receipt-divider" />
                         </div>
                     )}
 
-                    <div className="receipt-print-total" style={{ borderTop: '2px solid #000', paddingTop: '10px', display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: 'bold' }}>
-                        <span>TOTAL REVENUE:</span>
-                        <span>{formatCurrency(printingShift.stats?.totalRevenue ||
-                            (printingShift.paymentsByMode ? printingShift.paymentsByMode.reduce((sum: number, p: any) => sum + p.amount, 0) : ((printingShift.stats?.paymentsCash || 0) + (printingShift.stats?.paymentsCard || 0) + (printingShift.stats?.paymentsWallet || 0)))
-                        )}</span>
+                    <div style={{ marginTop: 'auto' }}>
+                        {printingSession?.sessionCharge && (
+                            <>
+                                <div className="receipt-row" style={{ fontSize: '14px', fontWeight: 'bold' }}>
+                                    <span>SUBTOTAL</span>
+                                    <span className="mono">EGP {(printingSession.sessionCharge.roomAmount + printingSession.sessionCharge.ordersAmount).toFixed(2)}</span>
+                                </div>
+                                {printingSession.sessionCharge.discount > 0 && (
+                                    <div className="receipt-row" style={{ fontSize: '12px' }}>
+                                        <span>DISCOUNT</span>
+                                        <span className="mono">-EGP {printingSession.sessionCharge.discount.toFixed(2)}</span>
+                                    </div>
+                                )}
+                                {printingSession.sessionCharge.serviceFee > 0 && (
+                                    <div className="receipt-row" style={{ fontSize: '12px' }}>
+                                        <span>SERVICE FEE</span>
+                                        <span className="mono">+EGP {printingSession.sessionCharge.serviceFee.toFixed(2)}</span>
+                                    </div>
+                                )}
+                                {printingSession.sessionCharge.tax > 0 && (
+                                    <div className="receipt-row" style={{ fontSize: '12px' }}>
+                                        <span>TAX</span>
+                                        <span className="mono">+EGP {printingSession.sessionCharge.tax.toFixed(2)}</span>
+                                    </div>
+                                )}
+                                {printingSession.sessionCharge.tip > 0 && (
+                                    <div className="receipt-row" style={{ fontSize: '12px' }}>
+                                        <span>TIP</span>
+                                        <span className="mono">+EGP {printingSession.sessionCharge.tip.toFixed(2)}</span>
+                                    </div>
+                                )}
+                            </>
+                        )}
+
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderTop: '2px solid #000', borderBottom: '2px solid #000', margin: '10px 0' }}>
+                            <span style={{ fontSize: '16px', fontWeight: '900' }}>TOTAL PAID</span>
+                            <span style={{ fontSize: '20px', fontWeight: '900' }} className="mono">
+                                EGP {(printingSession?.sessionCharge?.finalTotal || printingOrder?.orderCharge?.finalTotal || 0).toFixed(2)}
+                            </span>
+                        </div>
                     </div>
 
-                    <div className="receipt-print-total" style={{ borderTop: '2px solid #000', marginTop: '10px', paddingTop: '10px', display: 'flex', justifyContent: 'space-between', fontSize: '16px', fontWeight: '900' }}>
-                        <span>CASH ON HAND:</span>
-                        <span>
-                            {formatCurrency(
-                                (printingShift.paymentsByMode?.find(m => m.name.toLowerCase() === 'cash')?.amount || printingShift.stats?.paymentsCash || 0)
-                                - (printingShift.stats?.expenses ? printingShift.stats.expenses.reduce((sum: number, e: any) => sum + e.amount, 0) : 0)
-                            )}
-                        </span>
+                    <div style={{ textAlign: 'center', marginTop: '20px' }}>
+                        <div style={{ fontSize: '14px', fontWeight: '900', letterSpacing: '2px', marginBottom: '4px' }}>THANK YOU</div>
+                        <div style={{ fontSize: '10px', opacity: 0.7 }}>SQUAD POS • Managed Efficiency</div>
                     </div>
-
-                    <div style={{ marginTop: '30px', borderTop: '1px dashed #000', paddingTop: '15px', textAlign: 'center' }}>
-                        Signature: _______________________
+                    <div style={{ marginTop: '30px', borderTop: '1px dashed #000', paddingTop: '15px', textAlign: 'center', fontSize: '8px', color: '#777' }}>
+                        Powered by XTRA
                     </div>
                 </div>
             )}
 
             {/* Session Details Modal */}
             {viewSession && (
-                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }} onClick={() => setViewSession(null)}>
+                <div className="no-print" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }} onClick={() => setViewSession(null)}>
                     <GlassPanel style={{ width: '100%', maxWidth: '600px', padding: '24px', maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                            <h3 style={{ margin: 0, fontSize: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}><Coffee size={20} color="var(--primary)" /> Session: {viewSession.room.name}</h3>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                <h3 style={{ margin: 0, fontSize: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <Coffee size={20} color="var(--primary)" /> Session: {viewSession.room.name}
+                                </h3>
+                                <button
+                                    onClick={() => printSessionReceipt(viewSession)}
+                                    title="Print Session Receipt"
+                                    style={{
+                                        background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)',
+                                        color: 'var(--text)', padding: '6px 12px', borderRadius: '8px', cursor: 'pointer',
+                                        display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px'
+                                    }}>
+                                    <Printer size={16} strokeWidth={2.5} /> Print Receipt
+                                </button>
+                            </div>
                             <button onClick={() => setViewSession(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}><X size={24} /></button>
                         </div>
 
@@ -610,10 +585,24 @@ const ShiftHistoryView: React.FC<ShiftHistoryViewProps> = ({ user }) => {
 
             {/* Order Details Modal */}
             {viewOrder && (
-                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }} onClick={() => setViewOrder(null)}>
+                <div className="no-print" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }} onClick={() => setViewOrder(null)}>
                     <GlassPanel style={{ width: '100%', maxWidth: '500px', padding: '24px', maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                            <h3 style={{ margin: 0, fontSize: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}><ReceiptText size={20} color="var(--primary)" /> Order Details</h3>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                <h3 style={{ margin: 0, fontSize: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <ReceiptText size={20} color="var(--primary)" /> Order Details
+                                </h3>
+                                <button
+                                    onClick={() => printOrderReceipt(viewOrder)}
+                                    title="Print Order Receipt"
+                                    style={{
+                                        background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)',
+                                        color: 'var(--text)', padding: '6px 12px', borderRadius: '8px', cursor: 'pointer',
+                                        display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px'
+                                    }}>
+                                    <Printer size={16} strokeWidth={2.5} /> Print Receipt
+                                </button>
+                            </div>
                             <button onClick={() => setViewOrder(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}><X size={24} /></button>
                         </div>
 

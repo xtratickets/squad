@@ -91,7 +91,7 @@ exports.closeShift = closeShift;
 const getShiftStats = async (req, res) => {
     const id = req.params.id;
     try {
-        const [stats, payments, activeModes, expenses, sessions] = await Promise.all([
+        const [stats, payments, activeModes, expenses, sessions, sessionCharges, orderCharges] = await Promise.all([
             prisma_service_1.prisma.shiftStats.findUnique({
                 where: { shiftId: id },
                 include: { shift: { include: { staff: { select: { username: true } } } } },
@@ -108,8 +108,13 @@ const getShiftStats = async (req, res) => {
                     room: { select: { name: true } },
                     sessionCharge: true
                 }
-            })
+            }),
+            prisma_service_1.prisma.sessionCharge.findMany({ where: { shiftId: id } }),
+            prisma_service_1.prisma.orderCharge.findMany({ where: { shiftId: id } })
         ]);
+        const totalServiceFees = sessionCharges.reduce((s, c) => s + c.serviceFee, 0) + orderCharges.reduce((s, c) => s + c.serviceFee, 0);
+        const totalTax = sessionCharges.reduce((s, c) => s + c.tax, 0) + orderCharges.reduce((s, c) => s + c.tax, 0);
+        const totalDiscounts = sessionCharges.reduce((s, c) => s + c.discount, 0) + orderCharges.reduce((s, c) => s + c.discount, 0);
         const groupedPayments = payments.reduce((acc, p) => {
             const modeName = p.mode?.name || 'Unknown';
             acc[modeName] = (acc[modeName] || 0) + p.amount;
@@ -123,6 +128,9 @@ const getShiftStats = async (req, res) => {
             ...stats,
             paymentsByMode,
             expenses,
+            totalServiceFees,
+            totalTax,
+            totalDiscounts,
             sessions: sessions.map(s => ({
                 id: s.id,
                 roomName: s.room.name,
@@ -268,10 +276,42 @@ const getShiftHistory = async (req, res) => {
                     payments: paymentsWithUrls
                 };
             }) || []);
+            const settlements = await Promise.all(shift.payments
+                .filter(p => p.referenceType === 'owner')
+                .map(async (p) => {
+                const owner = await prisma_service_1.prisma.user.findUnique({
+                    where: { id: p.referenceId },
+                    select: { username: true }
+                });
+                return {
+                    ...p,
+                    ownerName: owner?.username || 'Unknown Owner'
+                };
+            }));
+            const sessionsWithCharges = shift.openedSessions;
+            const standaloneOrders = shift.orders;
+            const totalServiceFees = sessionsWithCharges.reduce((sum, s) => sum + (s.sessionCharge?.serviceFee || 0), 0) +
+                standaloneOrders.reduce((sum, o) => sum + (o.orderCharge?.serviceFee || 0), 0);
+            const totalTax = sessionsWithCharges.reduce((sum, s) => sum + (s.sessionCharge?.tax || 0), 0) +
+                standaloneOrders.reduce((sum, o) => sum + (o.orderCharge?.tax || 0), 0);
+            const totalDiscounts = sessionsWithCharges.reduce((sum, s) => sum + (s.sessionCharge?.discount || 0), 0) +
+                standaloneOrders.reduce((sum, o) => sum + (o.orderCharge?.discount || 0), 0);
             return {
                 ...shift,
-                stats: shift.stats ? { ...shift.stats, expenses: shift.expenses } : { expenses: shift.expenses },
+                stats: shift.stats ? {
+                    ...shift.stats,
+                    expenses: shift.expenses,
+                    totalServiceFees,
+                    totalTax,
+                    totalDiscounts
+                } : {
+                    expenses: shift.expenses,
+                    totalServiceFees,
+                    totalTax,
+                    totalDiscounts
+                },
                 openedSessions,
+                settlements,
                 paymentsByMode,
                 payments: undefined
             };

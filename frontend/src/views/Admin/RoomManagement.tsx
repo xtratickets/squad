@@ -12,7 +12,7 @@ const RoomManagement: React.FC = () => {
     const [rooms, setRooms] = useState<Room[]>([]);
     const [isEditing, setIsEditing] = useState<string | null>(null);
     const [isCreating, setIsCreating] = useState(false);
-    const [formData, setFormData] = useState({ name: '', category: '', pricePerHour: 0, minMinutes: 0, status: 'available' });
+    const [formData, setFormData] = useState({ name: '', category: '', pricePerHour: 0, minMinutes: 0, displayOrder: 0, status: 'available' });
     const [loading, setLoading] = useState(true);
 
     const [page, setPage] = useState(1);
@@ -41,7 +41,7 @@ const RoomManagement: React.FC = () => {
         try {
             await adminService.createRoom(formData);
             setIsCreating(false);
-            setFormData({ name: '', category: '', pricePerHour: 0, minMinutes: 0, status: 'available' });
+            setFormData({ name: '', category: '', pricePerHour: 0, minMinutes: 0, displayOrder: 0, status: 'available' });
             loadRooms();
             toast.success('Room created successfully');
         } catch (err: unknown) {
@@ -72,6 +72,7 @@ const RoomManagement: React.FC = () => {
             category: room.category,
             pricePerHour: room.pricePerHour,
             minMinutes: room.minMinutes,
+            displayOrder: room.displayOrder || 0,
             status: room.status
         });
     };
@@ -139,6 +140,17 @@ const RoomManagement: React.FC = () => {
                     {r.status}
                 </span>
             )
+        },
+        {
+            header: 'Display Order',
+            key: 'displayOrder',
+            render: (r: Room) => isEditing === r.id ? (
+                <Input
+                    type="number"
+                    value={formData.displayOrder}
+                    onChange={e => setFormData({ ...formData, displayOrder: parseInt(e.target.value) || 0 })}
+                />
+            ) : r.displayOrder || 0
         }
     ];
 
@@ -161,6 +173,7 @@ const RoomManagement: React.FC = () => {
                         <Input placeholder="Category" value={formData.category} onChange={e => setFormData({ ...formData, category: e.target.value })} required />
                         <Input type="number" placeholder="Price Per Hour" value={formData.pricePerHour} onChange={e => setFormData({ ...formData, pricePerHour: parseFloat(e.target.value) })} required />
                         <Input type="number" placeholder="Min Minutes" value={formData.minMinutes} onChange={e => setFormData({ ...formData, minMinutes: parseInt(e.target.value) })} required />
+                        <Input type="number" placeholder="Display Order (Optional)" value={formData.displayOrder} onChange={e => setFormData({ ...formData, displayOrder: parseInt(e.target.value) || 0 })} />
                         <div style={{ display: 'flex', gap: '10px' }}>
                             <Button type="submit">Create</Button>
                             <Button type="button" variant="secondary" onClick={() => setIsCreating(false)}>Cancel</Button>

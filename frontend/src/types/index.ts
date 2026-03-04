@@ -21,6 +21,7 @@ export interface Room {
     category: string;
     pricePerHour: number;
     minMinutes: number;
+    displayOrder: number;
     status: 'available' | 'occupied' | 'cleaning' | 'maintenance';
 }
 
@@ -137,8 +138,19 @@ export interface PromoCode {
 
 export interface FeeConfig {
     id: string;
-    serviceFeePercent: number;
+    roomServiceFeePercent: number;
+    orderServiceFeePercent: number;
+    walkInServiceFeePercent: number;
+    ownerServiceFeePercent: number;
     taxPercent: number;
+}
+
+export interface Settlement {
+    id: string;
+    amount: number;
+    ownerName: string;
+    mode?: { name: string };
+    createdAt: string;
 }
 
 export interface Shift {
@@ -154,6 +166,7 @@ export interface Shift {
     paymentsByMode?: { name: string; amount: number }[];
     openedSessions?: SessionDetail[];
     orders?: SessionOrder[];
+    settlements?: Settlement[];
 }
 
 export interface ShiftStats {
@@ -167,7 +180,13 @@ export interface ShiftStats {
     paymentsByMode?: { name: string; amount: number }[];
     expensesTotal?: number;
     totalRevenue?: number;
+    sessionsRevenue?: number;
+    ordersRevenue?: number;
+    tipsTotal?: number;
     expenses?: any[];
+    totalServiceFees?: number;
+    totalTax?: number;
+    totalDiscounts?: number;
 }
 
 export interface GlobalStats {
@@ -176,6 +195,10 @@ export interface GlobalStats {
     totalRevenue: number;
     activeRooms: number;
     revenueByMode: Array<{ modeId: string; _sum: { amount: number | null } }>;
+    revenueBySource: Array<{ referenceType: string; _sum: { amount: number | null } }>;
+    totalServiceFees?: number;
+    totalTax?: number;
+    totalDiscounts?: number;
 }
 
 export interface SessionOrderItem {

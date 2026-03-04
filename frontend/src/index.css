@@ -11,6 +11,14 @@
   --glass: rgba(255, 255, 255, 0.03);
   --border: rgba(255, 255, 255, 0.1);
   --font-family: 'Outfit', 'Inter', system-ui, -apple-system, sans-serif;
+  --max-width: 1400px;
+  --container-padding: 30px;
+}
+
+@media (max-width: 768px) {
+  :root {
+    --container-padding: 15px;
+  }
 }
 
 * {
@@ -138,6 +146,84 @@ button.danger:hover {
   background: rgba(255, 255, 255, 0.04);
 }
 
+/* --- RESPONSIVE UTILITIES --- */
+.container {
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: 0 var(--container-padding);
+  width: 100%;
+}
+
+.hide-on-mobile {
+  display: block;
+}
+
+.stack-on-mobile {
+  display: flex;
+}
+
+@media (max-width: 768px) {
+  .hide-on-mobile {
+    display: none !important;
+  }
+
+  .stack-on-mobile {
+    flex-direction: column !important;
+  }
+
+  .admin-tab {
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+
+  .glass-panel {
+    border-radius: 12px;
+  }
+
+  input,
+  textarea,
+  button {
+    padding: 12px 16px;
+    border-radius: 10px;
+  }
+}
+
+.scrollable-x {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.scrollable-x::-webkit-scrollbar {
+  display: none;
+}
+
+/* --- CUSTOM SCROLLBAR --- */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* Firefox support (added to existing global selector if needed, or separate) */
+html {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.15) rgba(0, 0, 0, 0.2);
+}
+
 /* --- PRINT STYLES --- */
 @media print {
 
@@ -185,7 +271,8 @@ button.danger:hover {
   /* Receipt Area Container */
   .receipt-print-area {
     display: block !important;
-    width: 72mm !important; /* Slightly narrower to avoid clipping on most 80mm printers */
+    width: 72mm !important;
+    /* Slightly narrower to avoid clipping on most 80mm printers */
     max-height: none !important;
     height: auto !important;
     overflow: visible !important;
@@ -195,7 +282,8 @@ button.danger:hover {
     box-shadow: none !important;
     background: white !important;
     color: #000 !important;
-    font-size: 11px !important; /* Slightly smaller for dense thermal printing */
+    font-size: 11px !important;
+    /* Slightly smaller for dense thermal printing */
     font-family: 'Inter', sans-serif !important;
     line-height: 1.2 !important;
   }
@@ -222,7 +310,7 @@ button.danger:hover {
   }
 
   /* Force bold for important headers and totals */
-  .receipt-print-area b, 
+  .receipt-print-area b,
   .receipt-print-area strong,
   .receipt-print-area h2,
   .receipt-print-area h3,

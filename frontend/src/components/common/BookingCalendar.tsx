@@ -13,9 +13,6 @@ interface BookingCalendarProps {
     isGuest?: boolean;
 }
 
-const HOUR_WIDTH = 100; // px per hour
-const HOURS_IN_DAY = 24;
-
 const statusColors: Record<string, { bg: string; border: string; text: string }> = {
     pending: { bg: 'rgba(255,171,0,0.2)', border: 'rgba(255,171,0,0.5)', text: '#ffc400' },
     confirmed: { bg: 'rgba(41,121,255,0.2)', border: 'rgba(41,121,255,0.5)', text: '#82b1ff' },
@@ -50,9 +47,9 @@ const DetailDialog: React.FC<{
             style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9000, padding: '20px' }}
             onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
         >
-            <div style={{ background: 'var(--surface)', border: `1px solid ${colors.border}`, borderRadius: '16px', width: '100%', maxWidth: '480px', boxShadow: `0 8px 48px rgba(0,0,0,0.5), 0 0 0 1px ${colors.border}`, overflow: 'hidden' }}>
+            <div style={{ background: 'var(--surface)', border: `1px solid ${colors.border}`, borderRadius: '16px', width: '100%', maxWidth: '480px', maxHeight: '90vh', overflowY: 'auto', boxShadow: `0 8px 48px rgba(0,0,0,0.5), 0 0 0 1px ${colors.border}` }}>
                 {/* Header */}
-                <div style={{ padding: '20px 24px', background: colors.bg, borderBottom: `1px solid ${colors.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ padding: '20px 24px', background: colors.bg, borderBottom: `1px solid ${colors.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, zIndex: 1, backdropFilter: 'blur(10px)' }}>
                     <div>
                         <div style={{ fontSize: '11px', color: colors.text, fontWeight: '800', textTransform: 'uppercase', letterSpacing: '1.5px', marginBottom: '4px' }}>
                             {res.status.replace('_', ' ')}
@@ -150,7 +147,7 @@ const DetailDialog: React.FC<{
 
                 {/* Actions */}
                 {onAction && res.status !== 'cancelled' && (
-                    <div style={{ padding: '16px 24px', borderTop: '1px solid var(--border)', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                    <div style={{ padding: '16px 24px', borderTop: '1px solid var(--border)', display: 'flex', gap: '10px', flexWrap: 'wrap', position: 'sticky', bottom: 0, background: 'var(--surface)', zIndex: 1 }}>
                         {res.status === 'pending' && (
                             <>
                                 <Button
@@ -218,6 +215,17 @@ export const BookingCalendar: React.FC<BookingCalendarProps> = ({
     isGuest = false,
 }) => {
     const [selectedRes, setSelectedRes] = useState<Reservation | null>(null);
+    const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
+    React.useEffect(() => {
+        const handleResize = () => setIsMobile(window.innerWidth < 768);
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
+
+    const HOUR_WIDTH = isMobile ? 80 : 100; // px per hour
+    const ROOM_COL_WIDTH = isMobile ? 100 : 150;
+    const HOURS_IN_DAY = 24;
 
     const startOfDay = useMemo(() => {
         const d = new Date(currentDate);
@@ -246,28 +254,31 @@ export const BookingCalendar: React.FC<BookingCalendarProps> = ({
     const handleToday = () => onDateChange?.(new Date());
 
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', height: '100%' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '12px' : '20px', height: '100%' }}>
             {/* Header / Date Picker */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.03)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border)', flexShrink: 0 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.03)', padding: isMobile ? '12px' : '16px', borderRadius: '12px', border: '1px solid var(--border)', flexShrink: 0, flexWrap: 'wrap', gap: '12px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <CalendarIcon size={20} color="var(--primary)" />
-                    <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '600' }}>Schedule Bookings</h3>
+                    <CalendarIcon size={isMobile ? 18 : 20} color="var(--primary)" />
+                    <h3 style={{ margin: 0, fontSize: isMobile ? '14px' : '16px', fontWeight: '600' }}>Schedule Bookings</h3>
                 </div>
-                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                    <Button variant="secondary" size="small" onClick={handlePrevDay} icon={<ChevronLeft size={16} />}>Prev</Button>
-                    <div style={{ padding: '6px 16px', background: 'var(--background)', borderRadius: '8px', border: '1px solid var(--border)', fontWeight: 'bold', fontSize: '14px', minWidth: '160px', textAlign: 'center' }}>
-                        {currentDate.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', width: isMobile ? '100%' : 'auto', justifyContent: isMobile ? 'space-between' : 'flex-end' }}>
+                    <div style={{ display: 'flex', gap: '4px' }}>
+                        <Button variant="secondary" size="small" onClick={handlePrevDay} icon={<ChevronLeft size={16} />} />
+                        <Button variant="secondary" size="small" onClick={handleNextDay} icon={<ChevronRight size={16} />} />
                     </div>
-                    <Button variant="secondary" size="small" onClick={handleNextDay} icon={<ChevronRight size={16} />}>Next</Button>
-                    <Button variant="secondary" size="small" onClick={handleToday} style={{ marginLeft: '8px' }}>Today</Button>
+                    <div style={{ padding: '6px 12px', background: 'var(--background)', borderRadius: '8px', border: '1px solid var(--border)', fontWeight: 'bold', fontSize: isMobile ? '12px' : '14px', minWidth: isMobile ? '120px' : '160px', textAlign: 'center' }}>
+                        {currentDate.toLocaleDateString([], isMobile ? { month: 'short', day: 'numeric' } : { weekday: 'short', month: 'short', day: 'numeric' })}
+                    </div>
+                    <Button variant="secondary" size="small" onClick={handleToday}>{isMobile ? 'Today' : 'Today'}</Button>
                 </div>
             </div>
 
             {/* Timeline */}
-            <div style={{ flex: 1, overflowX: 'auto', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)', borderRadius: '12px', display: 'flex', flexDirection: 'column', minHeight: '300px' }}>
+            <div style={{ flex: 1, overflow: 'auto', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)', borderRadius: '12px', display: 'flex', flexDirection: 'column', minHeight: '300px', WebkitOverflowScrolling: 'touch' }}>
+
                 {/* Hour Headers */}
                 <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', background: 'rgba(255,255,255,0.02)', position: 'sticky', top: 0, zIndex: 10, flexShrink: 0 }}>
-                    <div style={{ width: '150px', minWidth: '150px', padding: '14px 16px', borderRight: '1px solid var(--border)', fontWeight: 'bold', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                    <div style={{ width: `${ROOM_COL_WIDTH}px`, minWidth: `${ROOM_COL_WIDTH}px`, padding: '14px 16px', borderRight: '1px solid var(--border)', fontWeight: 'bold', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px' }}>
                         Room
                     </div>
                     <div style={{ display: 'flex', width: `${HOURS_IN_DAY * HOUR_WIDTH}px`, flexShrink: 0 }}>
@@ -284,16 +295,17 @@ export const BookingCalendar: React.FC<BookingCalendarProps> = ({
                     {(rooms ?? []).map((room, index) => {
                         const roomRes = dailyReservations.filter(r => r.roomId === room.id);
                         return (
-                            <div key={room.id} style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.04)', minHeight: '64px', position: 'relative' }}>
+                            <div key={room.id} style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.04)', minHeight: isMobile ? '56px' : '64px', position: 'relative' }}>
                                 {/* Room Label */}
                                 <div style={{
-                                    width: '150px', minWidth: '150px', padding: '14px 16px',
+                                    width: `${ROOM_COL_WIDTH}px`, minWidth: `${ROOM_COL_WIDTH}px`, padding: '10px 12px',
                                     borderRight: '1px solid var(--border)',
                                     background: index % 2 === 0 ? 'rgba(255,255,255,0.01)' : 'transparent',
                                     display: 'flex', flexDirection: 'column', justifyContent: 'center',
                                     position: 'sticky', left: 0, zIndex: 5,
+                                    backdropFilter: 'blur(5px)'
                                 }}>
-                                    <span style={{ fontWeight: '700', fontSize: '13px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{room.name}</span>
+                                    <span style={{ fontWeight: '700', fontSize: isMobile ? '12px' : '13px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{room.name}</span>
                                     <span style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px' }}>{room.category}</span>
                                 </div>
 
@@ -319,7 +331,7 @@ export const BookingCalendar: React.FC<BookingCalendarProps> = ({
                                         const durationMinutes = (renderEnd - renderStart) / 60000;
 
                                         const leftPx = (startOffsetMinutes / 60) * HOUR_WIDTH;
-                                        const widthPx = Math.max((durationMinutes / 60) * HOUR_WIDTH, 64);
+                                        const widthPx = Math.max((durationMinutes / 60) * HOUR_WIDTH, isMobile ? 48 : 64);
 
                                         const colors = statusColors[res.status] ?? statusColors.pending;
 
@@ -328,19 +340,19 @@ export const BookingCalendar: React.FC<BookingCalendarProps> = ({
                                                 key={res.id}
                                                 onClick={(e) => {
                                                     e.stopPropagation();
-                                                    if (!isGuest) setSelectedRes(res);
+                                                    if (!isGuest || isAdmin) setSelectedRes(res);
                                                 }}
                                                 title={`${(res as any).guestName || 'Guest'} — Click for details`}
                                                 style={{
                                                     position: 'absolute',
-                                                    top: '6px', bottom: '6px',
+                                                    top: '4px', bottom: '4px',
                                                     left: `${leftPx}px`,
                                                     width: `${widthPx}px`,
                                                     background: colors.bg,
                                                     border: `2px solid ${colors.border}`,
-                                                    borderRadius: '8px',
-                                                    padding: '4px 8px',
-                                                    cursor: 'pointer',
+                                                    borderRadius: '6px',
+                                                    padding: '2px 6px',
+                                                    cursor: isGuest && !isAdmin ? 'default' : 'pointer',
                                                     overflow: 'hidden',
                                                     zIndex: 2,
                                                     transition: 'all 0.15s',
@@ -350,30 +362,29 @@ export const BookingCalendar: React.FC<BookingCalendarProps> = ({
                                                     boxSizing: 'border-box',
                                                 }}
                                                 onMouseEnter={e => {
-                                                    (e.currentTarget as HTMLElement).style.transform = 'scaleY(1.05)';
-                                                    (e.currentTarget as HTMLElement).style.zIndex = '10';
-                                                    (e.currentTarget as HTMLElement).style.boxShadow = `0 4px 20px ${colors.border}`;
+                                                    if (!isGuest || isAdmin) {
+                                                        (e.currentTarget as HTMLElement).style.transform = 'scaleY(1.05)';
+                                                        (e.currentTarget as HTMLElement).style.zIndex = '10';
+                                                        (e.currentTarget as HTMLElement).style.boxShadow = `0 4px 20px ${colors.border}`;
+                                                    }
                                                 }}
                                                 onMouseLeave={e => {
-                                                    (e.currentTarget as HTMLElement).style.transform = 'scaleY(1)';
-                                                    (e.currentTarget as HTMLElement).style.zIndex = '2';
-                                                    (e.currentTarget as HTMLElement).style.boxShadow = 'none';
+                                                    if (!isGuest || isAdmin) {
+                                                        (e.currentTarget as HTMLElement).style.transform = 'scaleY(1)';
+                                                        (e.currentTarget as HTMLElement).style.zIndex = '2';
+                                                        (e.currentTarget as HTMLElement).style.boxShadow = 'none';
+                                                    }
                                                 }}
                                             >
                                                 <div style={{ fontSize: '9px', color: colors.text, fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.5px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                                     {res.status.replace('_', ' ')}
                                                 </div>
-                                                <div style={{ fontSize: '10px', fontWeight: '600', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: 'var(--text)' }}>
+                                                <div style={{ fontSize: isMobile ? '9px' : '10px', fontWeight: '600', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: 'var(--text)' }}>
                                                     {rStart.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} – {isOpenTimed ? '??:??' : rEnd.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                                 </div>
-                                                {(res as any).guestName && (
+                                                {!isMobile && (res as any).guestName && (
                                                     <div style={{ fontSize: '9px', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginTop: '1px', fontWeight: '600' }}>
                                                         {(res as any).guestName}
-                                                    </div>
-                                                )}
-                                                {(res as any).guestPhone && (
-                                                    <div style={{ fontSize: '8px', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                                        {(res as any).guestPhone}
                                                     </div>
                                                 )}
                                             </div>
@@ -393,14 +404,14 @@ export const BookingCalendar: React.FC<BookingCalendarProps> = ({
             </div>
 
             {/* Legend */}
-            <div style={{ display: 'flex', gap: '16px', padding: '0 4px', fontSize: '11px', color: 'var(--text-muted)', flexShrink: 0, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: '12px', padding: '0 4px', fontSize: '10px', color: 'var(--text-muted)', flexShrink: 0, flexWrap: 'wrap' }}>
                 {Object.entries(statusColors).map(([status, c]) => (
                     <div key={status} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <div style={{ width: 12, height: 12, borderRadius: 3, background: c.bg, border: `1px solid ${c.border}` }} />
+                        <div style={{ width: 10, height: 10, borderRadius: 2, background: c.bg, border: `1px solid ${c.border}` }} />
                         <span style={{ textTransform: 'capitalize' }}>{status.replace('_', ' ')}</span>
                     </div>
                 ))}
-                <span style={{ marginLeft: 'auto', fontStyle: 'italic', color: 'var(--text-muted)' }}>Click a block to view details</span>
+                {!isGuest && <span style={{ marginLeft: 'auto', fontStyle: 'italic', color: 'var(--text-muted)' }}>Click a block to view details</span>}
             </div>
 
             {/* Detail Dialog */}

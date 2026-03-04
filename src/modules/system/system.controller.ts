@@ -86,12 +86,15 @@ export const seedAdmin = async (req: Request, res: Response) => {
         });
 
         // 3. Default Fee Config
-        await prisma.feeConfig.upsert({
+        await (prisma as any).feeConfig.upsert({
             where: { id: 'default' },
             update: {},
             create: {
                 id: 'default',
-                serviceFeePercent: 10,
+                roomServiceFeePercent: 10,
+                orderServiceFeePercent: 10,
+                walkInServiceFeePercent: 10,
+                ownerServiceFeePercent: 0,
                 taxPercent: 5,
             },
         });

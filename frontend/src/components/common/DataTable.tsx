@@ -35,44 +35,46 @@ function DataTable<T extends { id: string | number }>({
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             {searchKey && (
-                <div style={{ position: 'relative', width: '300px' }}>
+                <div style={{ position: 'relative', width: '100%', maxWidth: '300px' }}>
                     <Search size={18} style={{ position: 'absolute', left: '15px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
                     <input
                         placeholder={searchPlaceholder}
                         value={searchTerm}
                         onChange={e => setSearchTerm(e.target.value)}
-                        style={{ paddingLeft: '45px', width: '100%' }}
+                        style={{ paddingLeft: '45px', width: '100%', boxSizing: 'border-box' }}
                     />
                 </div>
             )}
 
             <GlassPanel style={{ overflow: 'hidden' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-                    <thead>
-                        <tr style={{ background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid var(--border)' }}>
-                            {columns.map((col, idx) => (
-                                <th key={idx} style={{ padding: '20px' }}>{col.header}</th>
-                            ))}
-                            {actions && <th style={{ padding: '20px', textAlign: 'right' }}>Actions</th>}
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {filteredData.map((item) => (
-                            <tr key={item.id} className="data-table-row">
+                <div className="scrollable-x">
+                    <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '600px' }}>
+                        <thead>
+                            <tr style={{ background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid var(--border)' }}>
                                 {columns.map((col, idx) => (
-                                    <td key={idx} style={{ padding: '20px' }}>
-                                        {col.render ? col.render(item) : String((item as Record<string, unknown>)[col.key as string] ?? '')}
-                                    </td>
+                                    <th key={idx} style={{ padding: '20px' }}>{col.header}</th>
                                 ))}
-                                {actions && (
-                                    <td style={{ padding: '20px', textAlign: 'right' }}>
-                                        {actions(item)}
-                                    </td>
-                                )}
+                                {actions && <th style={{ padding: '20px', textAlign: 'right' }}>Actions</th>}
                             </tr>
-                        ))}
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody>
+                            {filteredData.map((item) => (
+                                <tr key={item.id} className="data-table-row">
+                                    {columns.map((col, idx) => (
+                                        <td key={idx} style={{ padding: '20px' }}>
+                                            {col.render ? col.render(item) : String((item as Record<string, unknown>)[col.key as string] ?? '')}
+                                        </td>
+                                    ))}
+                                    {actions && (
+                                        <td style={{ padding: '20px', textAlign: 'right' }}>
+                                            {actions(item)}
+                                        </td>
+                                    )}
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
             </GlassPanel>
         </div>
     );

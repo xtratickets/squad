@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import api from '../services/api';
 import GlassPanel from '../components/common/GlassPanel';
+import Modal from '../components/common/Modal';
 import Button from '../components/common/Button';
 import { Input, Select } from '../components/common/FormElements';
 import DataTable from '../components/common/DataTable';
@@ -39,6 +40,7 @@ const SessionsTab: React.FC = () => {
     const [paymentSession, setPaymentSession] = useState<any | null>(null); // session whose payments we're editing
     const [localPayments, setLocalPayments] = useState<any[]>([]);
     const [savingPayment, setSavingPayment] = useState(false);
+    const [viewingReceipt, setViewingReceipt] = useState<string | null>(null);
 
     const load = async () => {
         setLoading(true);
@@ -141,9 +143,12 @@ const SessionsTab: React.FC = () => {
                                     {modes.map(m => <option key={m.id} value={m.id} style={{ background: '#111' }}>{m.name}</option>)}
                                 </select>
                                 {p.receiptUrl && (
-                                    <a href={p.receiptUrl} target="_blank" rel="noreferrer">
+                                    <div
+                                        onClick={() => setViewingReceipt(p.receiptUrl)}
+                                        style={{ cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                                    >
                                         <img src={p.receiptUrl} alt="Receipt" style={{ height: '28px', width: '28px', objectFit: 'cover', borderRadius: '4px', border: '1px solid var(--border)' }} />
-                                    </a>
+                                    </div>
                                 )}
                                 <span style={{ marginLeft: 'auto', fontSize: '11px', color: 'var(--text-muted)' }}>{p.mode?.name ?? '—'}</span>
                             </div>
@@ -191,6 +196,21 @@ const SessionsTab: React.FC = () => {
                     )}
                 />
             )}
+
+            <Modal
+                isOpen={!!viewingReceipt}
+                onClose={() => setViewingReceipt(null)}
+                title="Payment Receipt"
+                maxWidth="500px"
+            >
+                {viewingReceipt && (
+                    <img
+                        src={viewingReceipt}
+                        alt="Receipt Full"
+                        style={{ width: '100%', borderRadius: '8px', display: 'block' }}
+                    />
+                )}
+            </Modal>
         </div>
     );
 };
@@ -381,6 +401,7 @@ const PaymentsTab: React.FC = () => {
     const [totalPages, setTotalPages] = useState(1);
     const [editing, setEditing] = useState<any | null>(null);
     const [form, setForm] = useState({ amount: '', modeId: '' });
+    const [viewingReceipt, setViewingReceipt] = useState<string | null>(null);
 
     const load = async () => {
         setLoading(true);
@@ -443,8 +464,15 @@ const PaymentsTab: React.FC = () => {
                         { header: 'Date', key: 'createdAt', render: (p: any) => <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{new Date(p.createdAt).toLocaleString()}</span> },
                         {
                             header: 'Receipt', key: 'receipt', render: (p: any) => p.receiptUrl
-                                ? <a href={p.receiptUrl} target="_blank" rel="noreferrer"><img src={p.receiptUrl} alt="Receipt" style={{ height: '30px', width: '30px', objectFit: 'cover', borderRadius: '4px', border: '1px solid var(--border)' }} /></a>
-                                : <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>—</span>
+                                ? (
+                                    <div
+                                        onClick={() => setViewingReceipt(p.receiptUrl)}
+                                        style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center' }}
+                                    >
+                                        <img src={p.receiptUrl} alt="Receipt" style={{ height: '30px', width: '30px', objectFit: 'cover', borderRadius: '4px', border: '1px solid var(--border)' }} />
+                                    </div>
+                                )
+                                : <span style={{ color: 'var(--text-muted)' }}>—</span>
                         },
                     ]}
                     actions={(p: any) => (
@@ -461,6 +489,21 @@ const PaymentsTab: React.FC = () => {
                     <Button variant="secondary" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages}>Next <ChevronRight size={16} /></Button>
                 </div>
             </div>
+
+            <Modal
+                isOpen={!!viewingReceipt}
+                onClose={() => setViewingReceipt(null)}
+                title="Payment Receipt"
+                maxWidth="500px"
+            >
+                {viewingReceipt && (
+                    <img
+                        src={viewingReceipt}
+                        alt="Receipt Full"
+                        style={{ width: '100%', borderRadius: '8px', display: 'block' }}
+                    />
+                )}
+            </Modal>
         </div>
     );
 };
@@ -592,18 +635,18 @@ const OperationsDashboard: React.FC = () => {
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
             {/* Tab bar */}
-            <GlassPanel style={{ padding: '0 8px', borderRadius: '14px', overflowX: 'auto' }}>
+            <GlassPanel style={{ padding: '0 8px', borderRadius: '14px', overflowX: 'auto', scrollbarWidth: 'none' }} className="scrollable-x">
                 <div style={{ display: 'flex', gap: '4px' }}>
                     {TABS.map(t => (
                         <div key={t.key} style={tabStyle(t.key)} onClick={() => setActiveTab(t.key)}>
-                            {t.icon} {t.label}
+                            {t.icon} <span className="hide-on-mobile">{t.label}</span>
                         </div>
                     ))}
                 </div>
             </GlassPanel>
 
             {/* Tab content */}
-            <GlassPanel style={{ padding: '24px', minHeight: '400px' }}>
+            <GlassPanel style={{ padding: 'var(--container-padding)', minHeight: '400px' }}>
                 {renderTab()}
             </GlassPanel>
         </div>

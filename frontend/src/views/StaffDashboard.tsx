@@ -1,16 +1,19 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import toast from 'react-hot-toast';
-import { roomService } from '../services/room.service';
-import { adminService } from '../services/admin.service';
 import GlassPanel from '../components/common/GlassPanel';
+import Modal from '../components/common/Modal';
+
 import Button from '../components/common/Button';
 import {
     Clock, Home, ShoppingCart, Users,
     CheckCircle, XCircle, ArrowRight, Zap,
-    X, CreditCard, Receipt, AlertCircle,
-    Plus, Package, Trash2, Printer, Camera, RefreshCw,
-    Pause, Play
+    Trash2, AlertCircle, Package, X, CreditCard, Plus,
+    ChevronDown, ChevronUp, History as HistoryIcon,
+    Printer, Camera, RefreshCw, Pause, Play, Receipt
 } from 'lucide-react';
+import { roomService } from '../services/room.service';
+import ShiftReport from '../components/common/ShiftReport';
+import { adminService } from '../services/admin.service';
 import type {
     Room, Shift, ShiftStats, PaymentMode, Payment, Reservation,
     SessionDetail, SessionBilling, RoomStateResponse, SessionOrder,
@@ -103,10 +106,7 @@ function getGreeting() {
 
 const fmt = (n: number) => n.toFixed(2);
 
-const formatDate = (iso: string) => {
-    if (!iso) return '';
-    return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-};
+
 
 // ─── Session Timer badge ──────────────────────────────────────────
 
@@ -135,8 +135,24 @@ const SessionTimer: React.FC<{
 
 // ─── Stat Card ────────────────────────────────────────────────────
 
-const StatCard: React.FC<{ icon: React.ReactNode; label: string; value: string; color: string; highlight?: boolean }> = ({ icon, label, value, color, highlight }) => (
-    <GlassPanel style={{ padding: '22px', background: highlight ? 'rgba(0,230,118,0.05)' : undefined, border: highlight ? '1px solid rgba(0,230,118,0.2)' : undefined }}>
+const StatCard: React.FC<{
+    icon: React.ReactNode;
+    label: string;
+    value: string;
+    color: string;
+    highlight?: boolean;
+    onClick?: () => void;
+}> = ({ icon, label, value, color, highlight, onClick }) => (
+    <GlassPanel
+        onClick={onClick}
+        style={{
+            padding: '22px',
+            background: highlight ? 'rgba(0,230,118,0.05)' : undefined,
+            border: highlight ? '1px solid rgba(0,230,118,0.2)' : undefined,
+            cursor: onClick ? 'pointer' : 'default',
+            transition: 'transform 0.2s, background 0.2s',
+        }}
+    >
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
             <div style={{ color }}>{icon}</div>
             <span style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px' }}>{label}</span>
@@ -144,6 +160,105 @@ const StatCard: React.FC<{ icon: React.ReactNode; label: string; value: string; 
         <div style={{ fontSize: '26px', fontWeight: '800', color, letterSpacing: '-1px' }}>{value}</div>
     </GlassPanel>
 );
+
+// ─── Revenue Calculation Breakdown ───────────────────────────────
+
+const RevenueCalculationModal: React.FC<{
+    isOpen: boolean;
+    stats: ShiftStatsReport | null;
+    onClose: () => void;
+}> = ({ isOpen, stats, onClose }) => {
+    if (!stats) return null;
+
+    const totalPayments = (stats.paymentsByMode || []).reduce((sum, m) => sum + m.amount, 0) ||
+        (stats.paymentsCash || 0) + (stats.paymentsCard || 0) + (stats.paymentsWallet || 0);
+
+    return (
+        <Modal isOpen={isOpen} title="Revenue Calculation Breakdown" onClose={onClose}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                <section>
+                    <h4 style={{ marginBottom: '12px', color: 'var(--primary)', fontSize: '14px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Collections (Payments)</h4>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', background: 'rgba(255,255,255,0.03)', padding: '16px', borderRadius: '12px' }}>
+                        {(stats.paymentsByMode && stats.paymentsByMode.length > 0) ? (
+                            stats.paymentsByMode.map(m => (
+                                <div key={m.name} style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                    <span style={{ color: 'var(--text-muted)' }}>{m.name}</span>
+                                    <span style={{ fontWeight: '600', fontFamily: 'monospace' }}>EGP {m.amount.toFixed(2)}</span>
+                                </div>
+                            ))
+                        ) : (
+                            <>
+                                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                    <span style={{ color: 'var(--text-muted)' }}>Cash</span>
+                                    <span style={{ fontWeight: '600', fontFamily: 'monospace' }}>EGP {stats.paymentsCash?.toFixed(2) || '0.00'}</span>
+                                </div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                    <span style={{ color: 'var(--text-muted)' }}>Card</span>
+                                    <span style={{ fontWeight: '600', fontFamily: 'monospace' }}>EGP {stats.paymentsCard?.toFixed(2) || '0.00'}</span>
+                                </div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                    <span style={{ color: 'var(--text-muted)' }}>Wallet</span>
+                                    <span style={{ fontWeight: '600', fontFamily: 'monospace' }}>EGP {stats.paymentsWallet?.toFixed(2) || '0.00'}</span>
+                                </div>
+                            </>
+                        )}
+                        <div style={{ borderTop: '1px solid var(--border)', paddingTop: '10px', marginTop: '6px', display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '15px' }}>
+                            <span>Total Collections</span>
+                            <span style={{ color: 'var(--primary)' }}>EGP {totalPayments.toFixed(2)}</span>
+                        </div>
+                    </div>
+                </section>
+
+                <section>
+                    <h4 style={{ marginBottom: '12px', color: 'var(--primary)', fontSize: '14px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Sales Breakdown</h4>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', background: 'rgba(255,255,255,0.03)', padding: '16px', borderRadius: '12px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ color: 'var(--text-muted)' }}>Room Sessions (Time)</span>
+                            <span style={{ fontWeight: '600', fontFamily: 'monospace' }}>EGP {stats.sessionsRevenue?.toFixed(2) || '0.00'}</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ color: 'var(--text-muted)' }}>Orders (Product Sales)</span>
+                            <span style={{ fontWeight: '600', fontFamily: 'monospace' }}>EGP {stats.ordersRevenue?.toFixed(2) || '0.00'}</span>
+                        </div>
+                        {(stats.totalServiceFees || 0) > 0 && (
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <span style={{ color: 'var(--text-muted)' }}>Service Fees</span>
+                                <span style={{ fontWeight: '600', fontFamily: 'monospace' }}>EGP {stats.totalServiceFees?.toFixed(2)}</span>
+                            </div>
+                        )}
+                        {(stats.totalTax || 0) > 0 && (
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <span style={{ color: 'var(--text-muted)' }}>Taxes</span>
+                                <span style={{ fontWeight: '600', fontFamily: 'monospace' }}>EGP {stats.totalTax?.toFixed(2)}</span>
+                            </div>
+                        )}
+                        {(stats.totalDiscounts || 0) > 0 && (
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <span style={{ color: 'var(--text-muted)' }}>Discounts Applied</span>
+                                <span style={{ fontWeight: '600', color: '#f87171', fontFamily: 'monospace' }}>-EGP {stats.totalDiscounts?.toFixed(2)}</span>
+                            </div>
+                        )}
+                        {stats?.tipsTotal && stats.tipsTotal > 0 && (
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <span style={{ color: 'var(--text-muted)' }}>Tips Received</span>
+                                <span style={{ fontWeight: '600', fontFamily: 'monospace' }}>EGP {stats.tipsTotal.toFixed(2)}</span>
+                            </div>
+                        )}
+                        <div style={{ borderTop: '1px solid var(--border)', paddingTop: '10px', marginTop: '6px', display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '15px' }}>
+                            <span>Total Sales (Revenue)</span>
+                            <span style={{ color: 'var(--primary)' }}>EGP {(stats.totalRevenue || 0).toFixed(2)}</span>
+                        </div>
+                    </div>
+                </section>
+
+                <div style={{ fontSize: '12px', color: 'var(--text-muted)', fontStyle: 'italic', padding: '12px', background: 'rgba(0,230,118,0.05)', borderRadius: '12px', border: '1px solid rgba(0,230,118,0.1)' }}>
+                    <strong>How is it calculated?</strong><br />
+                    Revenue is the total value of all closed sessions and approved orders. Collections represent the actual payments processed through different modes. Discrepancies may occur if orders are cancelled but payments were already recorded.
+                </div>
+            </div>
+        </Modal>
+    );
+};
 
 // ─── Reservation badge ────────────────────────────────────────────
 
@@ -254,7 +369,7 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, state, onClick, onAddOrder, o
                 display: 'flex',
                 flexDirection: 'column',
                 gap: '10px',
-                minHeight: '180px',
+                minHeight: '220px',
             }}
         >
             {/* Header row */}
@@ -334,10 +449,37 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, state, onClick, onAddOrder, o
             )}
 
             {/* CTA */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: cfg.color, fontSize: '12px', fontWeight: '600', marginTop: room.status === 'occupied' ? '0' : 'auto' }}>
-                {room.status === 'available' && <><ArrowRight size={13} /> Start Session</>}
-                {room.status === 'occupied' && <><Receipt size={13} /> View Receipt / Checkout</>}
-            </div>
+            {room.status === 'occupied' ? (
+                <button
+                    onClick={(e) => { e.stopPropagation(); isInteractive && onClick(); }}
+                    style={{
+                        marginTop: 'auto',
+                        width: '100%',
+                        padding: '12px',
+                        borderRadius: '8px',
+                        background: 'var(--primary)',
+                        color: '#000',
+                        border: 'none',
+                        fontWeight: '800',
+                        fontSize: '14px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px',
+                        boxShadow: '0 4px 12px rgba(0,230,118,0.3)',
+                        transition: 'transform 0.1s',
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'}
+                    onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
+                >
+                    <Receipt size={16} /> View Receipt / Checkout
+                </button>
+            ) : (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: cfg.color, fontSize: '13px', fontWeight: '700', marginTop: 'auto' }}>
+                    {room.status === 'available' && <><ArrowRight size={14} /> Start Session</>}
+                </div>
+            )}
         </GlassPanel>
     );
 };
@@ -1557,6 +1699,34 @@ const StaffDashboard: React.FC<StaffDashboardProps> = ({ rooms, fetchRooms, curr
     const [showNewOrderModal, setShowNewOrderModal] = useState(false);
     const [orderRoom, setOrderRoom] = useState<RoomWithSession | null>(null);
     const [isPrintingShiftReport, setIsPrintingShiftReport] = useState(false);
+    const [showDetailedReport, setShowDetailedReport] = useState(false);
+
+    const augmentedShiftForReport: Shift | null = currentShift ? {
+        ...currentShift,
+        staff: { username } as any,
+        stats: shiftStats ? {
+            ...shiftStats,
+            expenses: (shiftStats as any).expenses,
+            totalServiceFees: (shiftStats as any).totalServiceFees,
+            totalTax: (shiftStats as any).totalTax,
+            totalDiscounts: (shiftStats as any).totalDiscounts,
+        } : undefined,
+        paymentsByMode: (shiftStats as any)?.paymentsByMode || [],
+        openedSessions: shiftStats?.sessions?.map(s => ({
+            id: s.id,
+            room: { name: s.roomName } as any,
+            startTime: s.startTime,
+            endTime: s.endTime,
+            status: 'closed',
+            sessionCharge: {
+                finalTotal: s.finalTotal,
+                roomAmount: s.roomAmount,
+                ordersAmount: s.ordersAmount,
+                discount: s.discount
+            } as any
+        })) as any,
+        orders: orders as any // Standalone orders
+    } : null;
 
     const handlePrintShiftReport = () => {
         setIsPrintingShiftReport(true);
@@ -1620,6 +1790,8 @@ const StaffDashboard: React.FC<StaffDashboardProps> = ({ rooms, fetchRooms, curr
         });
         setRoomStates(prev => ({ ...prev, ...next }));
     }, [rooms]);
+
+    const [showRevenueCalc, setShowRevenueCalc] = useState(false);
 
     useEffect(() => {
         void fetchRoomStates();
@@ -1802,8 +1974,6 @@ const StaffDashboard: React.FC<StaffDashboardProps> = ({ rooms, fetchRooms, curr
     // Derived stats
     const occupied = rooms.filter(r => r.status === 'occupied').length;
     const available = rooms.filter(r => r.status === 'available').length;
-    const totalRevenue = (shiftStats?.paymentsCash ?? 0) + (shiftStats?.paymentsCard ?? 0) + (shiftStats?.paymentsWallet ?? 0);
-
     // Today's reservations
     const todayStr = new Date().toDateString();
     const todayReservations = reservations
@@ -1890,7 +2060,13 @@ const StaffDashboard: React.FC<StaffDashboardProps> = ({ rooms, fetchRooms, curr
                         </>
                     )}
 
-                    <StatCard icon="EGP" label="Total Revenue" value={`EGP ${fmt(totalRevenue)}`} color="var(--primary)" highlight />
+                    <StatCard
+                        icon="EGP"
+                        label="Total Payments without Tips"
+                        value={`EGP ${fmt(((shiftStats?.paymentsByMode?.reduce((s, m) => s + m.amount, 0) ?? 0) || (shiftStats?.paymentsCash ?? 0) + (shiftStats?.paymentsCard ?? 0) + (shiftStats?.paymentsWallet ?? 0)) - (shiftStats?.tipsTotal ?? 0))}`}
+                        color="var(--primary)"
+                        highlight
+                    />
 
                     {/* Expenses & Cash on Hand */}
                     {shiftStats?.expenses && shiftStats.expenses.length > 0 && (
@@ -1996,6 +2172,26 @@ const StaffDashboard: React.FC<StaffDashboardProps> = ({ rooms, fetchRooms, curr
 
                             {/* Right column */}
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                                {currentShift && (
+                                    <GlassPanel style={{ padding: '24px' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: showDetailedReport ? '20px' : '0' }}>
+                                            <h3 style={{ fontSize: '14px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+                                                <HistoryIcon size={16} color="var(--primary)" /> Detailed Shift Report
+                                            </h3>
+                                            <button
+                                                onClick={() => setShowDetailedReport(!showDetailedReport)}
+                                                style={{ padding: '4px 12px', fontSize: '12px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                                            >
+                                                {showDetailedReport ? 'Hide' : 'Show'} {showDetailedReport ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                                            </button>
+                                        </div>
+                                        {showDetailedReport && augmentedShiftForReport && (
+                                            <div style={{ marginTop: '20px', borderTop: '1px solid var(--border)', paddingTop: '20px' }}>
+                                                <ShiftReport shift={augmentedShiftForReport} />
+                                            </div>
+                                        )}
+                                    </GlassPanel>
+                                )}
 
                                 {/* Reservations Today */}
                                 <GlassPanel style={{ padding: '24px' }}>
@@ -2073,153 +2269,61 @@ const StaffDashboard: React.FC<StaffDashboardProps> = ({ rooms, fetchRooms, curr
             </div>
 
             {/* Shift Report Print Only */}
-            {isPrintingShiftReport && (
-                <div className="print-only receipt-print-area" style={{ display: 'none' }}>
-                    <h2 style={{ textAlign: 'center', margin: '0 0 10px 0', borderBottom: '1px dashed #000', paddingBottom: '10px', fontSize: '18px', fontWeight: '900' }}>SHIFT REPORT</h2>
-                    <div style={{ marginBottom: '15px' }}>
-                        <div><b>Date:</b> {new Date().toLocaleDateString()}</div>
-                        <div><b>Staff:</b> {username}</div>
-                        {currentShift && <div><b>Shift ID:</b> {currentShift.id.slice(0, 8)}</div>}
-                        {currentShift && <div><b>Started:</b> {new Date(currentShift.startTime).toLocaleTimeString()}</div>}
-                    </div>
-
-                    <div style={{ borderTop: '1px dashed #000', paddingTop: '10px', marginBottom: '15px' }}>
-                        <div style={{ marginBottom: '8px', fontWeight: 'bold' }}>Payments Collected:</div>
-                        {shiftStats?.paymentsByMode && shiftStats.paymentsByMode.length > 0 ? (
-                            shiftStats.paymentsByMode.map(mode => (
-                                <div key={mode.name} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                                    <span>{mode.name}</span>
-                                    <span style={{ fontWeight: '600', fontFamily: 'monospace' }}>{fmt(mode.amount)}</span>
-                                </div>
-                            ))
-                        ) : (
-                            <>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                                    <span>Cash</span>
-                                    <span style={{ fontWeight: '600', fontFamily: 'monospace' }}>{fmt(shiftStats?.paymentsCash ?? 0)}</span>
-                                </div>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                                    <span>Card</span>
-                                    <span style={{ fontWeight: '600', fontFamily: 'monospace' }}>{fmt(shiftStats?.paymentsCard ?? 0)}</span>
-                                </div>
-                            </>
-                        )}
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '6px', paddingTop: '6px', borderTop: '1px solid #000', fontWeight: 'bold' }}>
-                            <span>Total Payments</span>
-                            <span style={{ fontFamily: 'monospace' }}>{fmt((shiftStats?.paymentsByMode || []).reduce((sum, m) => sum + m.amount, 0) || (shiftStats?.paymentsCash || 0) + (shiftStats?.paymentsCard || 0))}</span>
-                        </div>
-                    </div>
-
-                    {shiftStats?.expenses && shiftStats.expenses.length > 0 && (
-                        <div style={{ borderTop: '1px dashed #000', paddingTop: '10px', marginBottom: '15px' }}>
-                            <div style={{ marginBottom: '8px', fontWeight: 'bold' }}>Expenses:</div>
-                            {shiftStats.expenses.map((exp: any) => (
-                                <div key={exp.id} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: '12px' }}>
-                                    <span>{exp.category} {exp.note ? `- ${exp.note}` : ''}</span>
-                                    <span style={{ fontWeight: '600', fontFamily: 'monospace' }}>-{fmt(exp.amount)}</span>
-                                </div>
-                            ))}
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '6px', paddingTop: '6px', borderTop: '1px solid #000', fontWeight: 'bold' }}>
-                                <span>Total Expenses</span>
-                                <span style={{ color: '#d32f2f', fontFamily: 'monospace' }}>-{fmt(shiftStats.expenses.reduce((sum: number, e: any) => sum + e.amount, 0))}</span>
-                            </div>
-                        </div>
-                    )}
-
-                    {shiftStats?.sessions && shiftStats.sessions.length > 0 && (
-                        <div style={{ borderTop: '1px dashed #000', paddingTop: '10px', marginBottom: '15px' }}>
-                            <div style={{ marginBottom: '8px', fontWeight: 'bold' }}>Sessions Breakdown:</div>
-                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
-                                <thead>
-                                    <tr style={{ borderBottom: '1px solid #000' }}>
-                                        <th style={{ textAlign: 'left', padding: '4px 0' }}>Room</th>
-                                        <th style={{ textAlign: 'center', padding: '4px 0' }}>Time</th>
-                                        <th style={{ textAlign: 'right', padding: '4px 0' }}>Amount</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {shiftStats.sessions.map(s => (
-                                        <tr key={s.id} style={{ borderBottom: '1px solid #eee' }}>
-                                            <td style={{ padding: '6px 0' }}>
-                                                <div>{s.roomName}</div>
-                                                <div style={{ fontSize: '9px', color: '#666' }}>{formatDate(s.startTime)} - {formatDate(s.endTime)}</div>
-                                            </td>
-                                            <td style={{ textAlign: 'center' }}>
-                                                {Math.round((new Date(s.endTime).getTime() - new Date(s.startTime).getTime()) / 60000)}m
-                                                {s.totalPausedMs > 0 && <span style={{ fontSize: '9px', color: 'var(--primary)' }}> (-{Math.round(s.totalPausedMs / 60000)}m)</span>}
-                                            </td>
-                                            <td style={{ textAlign: 'right', fontWeight: '600', fontFamily: 'monospace' }}>
-                                                EGP {fmt(s.finalTotal)}
-                                                {s.discount > 0 && <span style={{ fontSize: '9px', color: 'var(--primary)', display: 'block' }}>(-EGP {fmt(s.discount)})</span>}
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
-
-                    <div className="receipt-print-total" style={{ borderTop: '2px solid #000', paddingTop: '10px', display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: 'bold' }}>
-                        <span>TOTAL REVENUE:</span>
-                        <span style={{ fontFamily: 'monospace' }}>{fmt(shiftStats?.totalRevenue || totalRevenue)}</span>
-                    </div>
-
-                    <div className="receipt-print-total" style={{ borderTop: '2px solid #000', marginTop: '10px', paddingTop: '10px', display: 'flex', justifyContent: 'space-between', fontSize: '16px', fontWeight: '900' }}>
-                        <span>CASH ON HAND:</span>
-                        <span style={{ fontFamily: 'monospace' }}>
-                            {fmt(
-                                (shiftStats?.paymentsByMode?.find(m => m.name.toLowerCase() === 'cash')?.amount || shiftStats?.paymentsCash || 0)
-                                - (shiftStats?.expenses ? shiftStats.expenses.reduce((sum: number, e: any) => sum + e.amount, 0) : 0)
-                            )}
-                        </span>
-                    </div>
-
-                    <div style={{ marginTop: '30px', borderTop: '1px dashed #000', paddingTop: '15px', textAlign: 'center' }}>
-                        Signature: _______________________
-                    </div>
-                </div>
-            )}
+            {
+                isPrintingShiftReport && augmentedShiftForReport && (
+                    <ShiftReport shift={augmentedShiftForReport} mode="print" />
+                )
+            }
 
             {/* Receipt / Checkout Modal */}
-            {receiptRoom && receiptRoom.activeSession && (
-                <ReceiptModal
-                    sessionId={receiptRoom.activeSession.id!}
-                    roomName={receiptRoom.name}
-                    shiftId={currentShift?.id} // safely pass undefined when admins are just viewing
-                    modes={paymentModes}
-                    onConfirm={handleReceiptConfirm}
-                    onClose={() => setReceiptRoom(null)}
-                    onAddOrder={() => {
-                        setReceiptRoom(null);
-                        setOrderRoom(receiptRoom);
-                        setShowNewOrderModal(true);
-                    }}
-                    isAdminViewing={!currentShift && (userRole === 'ADMIN' || userRole === 'admin')}
-                    staffName={username}
-                />
-            )}
+            {
+                receiptRoom && receiptRoom.activeSession && (
+                    <ReceiptModal
+                        sessionId={receiptRoom.activeSession.id!}
+                        roomName={receiptRoom.name}
+                        shiftId={currentShift?.id} // safely pass undefined when admins are just viewing
+                        modes={paymentModes}
+                        onConfirm={handleReceiptConfirm}
+                        onClose={() => setReceiptRoom(null)}
+                        onAddOrder={() => {
+                            setReceiptRoom(null);
+                            setOrderRoom(receiptRoom);
+                            setShowNewOrderModal(true);
+                        }}
+                        isAdminViewing={!currentShift && (userRole === 'ADMIN' || userRole === 'admin')}
+                        staffName={username}
+                    />
+                )
+            }
 
             {/* New Order Modal */}
-            {showNewOrderModal && currentShift && (
-                <NewOrderModal
-                    shiftId={currentShift.id}
-                    roomId={orderRoom?.id}
-                    roomName={orderRoom?.name}
-                    sessionId={orderRoom?.activeSession?.id}
-                    modes={paymentModes}
-                    onCreated={() => {
-                        setShowNewOrderModal(false);
-                        setOrderRoom(null);
-                        void fetchOrders();
-                        void fetchRoomStates();
-                    }}
-                    onClose={() => {
-                        setShowNewOrderModal(false);
-                        setOrderRoom(null);
-                    }}
-                />
-            )}
+            {
+                showNewOrderModal && currentShift && (
+                    <NewOrderModal
+                        shiftId={currentShift.id}
+                        roomId={orderRoom?.id}
+                        roomName={orderRoom?.name}
+                        sessionId={orderRoom?.activeSession?.id}
+                        modes={paymentModes}
+                        onCreated={() => {
+                            setShowNewOrderModal(false);
+                            setOrderRoom(null);
+                            void fetchOrders();
+                            void fetchRoomStates();
+                        }}
+                        onClose={() => {
+                            setShowNewOrderModal(false);
+                            setOrderRoom(null);
+                        }}
+                    />
+                )
+            }
 
+            <RevenueCalculationModal
+                isOpen={showRevenueCalc}
+                stats={shiftStats}
+                onClose={() => setShowRevenueCalc(false)}
+            />
         </div>
     );
 };
