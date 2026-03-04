@@ -67,6 +67,15 @@ app.use('/api/owners', owner_routes_1.default);
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
+app.get('/api/logo', (req, res) => {
+    const logoPath = path_1.default.join(__dirname, '../public/Squad-logo-Final.png');
+    if (fs_1.default.existsSync(logoPath)) {
+        res.sendFile(logoPath);
+    }
+    else {
+        res.status(404).json({ error: 'Logo not found' });
+    }
+});
 const candidatePaths = [
     path_1.default.join(__dirname, '../frontend/dist'),
     path_1.default.join(__dirname, '../../frontend/dist'),

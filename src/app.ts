@@ -75,6 +75,18 @@ app.get('/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// Simple route to return the squad logo image.  Place the image file at
+// <root>/public/logo.png (or update the path below).  This endpoint will
+// stream the file so browsers can request it directly.
+app.get('/api/logo', (req, res) => {
+    const logoPath = path.join(__dirname, '../public/Squad-logo-Final.png');
+    if (fs.existsSync(logoPath)) {
+        res.sendFile(logoPath);
+    } else {
+        res.status(404).json({ error: 'Logo not found' });
+    }
+});
+
 // Resolve frontend static path — tries multiple depths to handle different tsconfig outDir configs
 const candidatePaths = [
     path.join(__dirname, '../frontend/dist'),   // if outDir = ./dist
