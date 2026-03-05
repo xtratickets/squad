@@ -374,7 +374,7 @@ export const updateOrder = async (req: any, res: Response) => {
 
 export const updateOrderItems = async (req: any, res: Response) => {
     const id = req.params.id as string;
-    const { items } = req.body;
+    const { items, type, ownerUserId } = req.body;
     const userId = req.user.userId;
 
     try {
@@ -394,7 +394,9 @@ export const updateOrderItems = async (req: any, res: Response) => {
             const discountAmount = order.orderCharge?.discount || 0;
             const tip = order.orderCharge?.tip || 0;
 
+            // 1. Revert previous state if approved
             if (order.status === 'approved') {
+                // Revert stock
                 for (const item of order.items) {
                     await tx.product.update({
                         where: { id: item.productId },
@@ -404,10 +406,53 @@ export const updateOrderItems = async (req: any, res: Response) => {
                         data: { productId: item.productId, qty: item.qty, type: 'add', reference: `order_${order.id}_edit_revert` }
                     });
                 }
+
+                // Revert owner wallet if it was an owner order
+                if (order.type === 'owner' && (order as any).ownerUserId) {
+                    const oldCharge = order.orderCharge!;
+                    await (tx as any).user.update({
+                        where: { id: (order as any).ownerUserId },
+                        data: { walletBalance: { increment: oldCharge.finalTotal } }
+                    });
+                    await (tx as any).walletTransaction.create({
+                        data: {
+                            userId: (order as any).ownerUserId,
+                            amount: oldCharge.finalTotal,
+                            note: `Order #${order.id.slice(0, 8)} edit revert`,
+                            orderId: order.id,
+                            shiftId: order.shiftId
+                        }
+                    });
+
+                    // Revert Payment & ShiftStats Card/Cash/Wallet (though for owner it's always wallet)
+                    const payment = await tx.payment.findFirst({
+                        where: { referenceType: 'order', referenceId: id, modeId: 'WALLET' }
+                    });
+                    if (payment) {
+                        await tx.payment.delete({ where: { id: payment.id } });
+                        await tx.shiftStats.update({
+                            where: { shiftId: order.shiftId },
+                            data: { paymentsWallet: { decrement: payment.amount } }
+                        });
+                    }
+                }
+
+                // Revert ShiftStats Revenue
+                if (order.orderCharge) {
+                    const charge = order.orderCharge;
+                    await tx.shiftStats.update({
+                        where: { shiftId: order.shiftId },
+                        data: {
+                            ordersRevenue: { decrement: charge.itemsTotal - charge.discount },
+                            totalRevenue: { decrement: charge.itemsTotal - charge.discount },
+                            tipsTotal: { decrement: charge.tip },
+                        },
+                    });
+                }
             }
 
+            // 2. Update Order items & basic info
             await tx.orderItem.deleteMany({ where: { orderId: id } });
-
             if (!items || items.length === 0) throw new Error('Order must have at least one item');
 
             for (const item of items) {
@@ -425,6 +470,7 @@ export const updateOrderItems = async (req: any, res: Response) => {
                     }
                 });
 
+                // Apply new stock if approved
                 if (order.status === 'approved') {
                     await tx.product.update({
                         where: { id: item.productId },
@@ -436,9 +482,18 @@ export const updateOrderItems = async (req: any, res: Response) => {
                 }
             }
 
+            // Update Order Type/Owner
+            const updatedOrder = await tx.order.update({
+                where: { id },
+                data: {
+                    type: type || order.type,
+                    ownerUserId: type === 'owner' ? (ownerUserId || (order as any).ownerUserId) : null,
+                }
+            });
+
+            // 3. Apply new state if approved
             if (order.status === 'approved') {
-                const charges = await BillingService.computeOrderCharge(id, discountAmount, tip);
-                const oldCharge = order.orderCharge!;
+                const charges = await BillingService.computeOrderCharge(id, discountAmount, tip, tx);
 
                 await tx.orderCharge.update({
                     where: { orderId: id },
@@ -452,37 +507,49 @@ export const updateOrderItems = async (req: any, res: Response) => {
                     }
                 });
 
-                const diffRevenue = (charges.itemsTotal - charges.discount) - (oldCharge.itemsTotal - oldCharge.discount);
+                // Apply new Revenue Stats
+                await tx.shiftStats.update({
+                    where: { shiftId: order.shiftId },
+                    data: {
+                        ordersRevenue: { increment: charges.itemsTotal - charges.discount },
+                        totalRevenue: { increment: charges.itemsTotal - charges.discount },
+                        tipsTotal: { increment: charges.tip },
+                    }
+                });
 
-                if (diffRevenue !== 0) {
-                    await tx.shiftStats.update({
-                        where: { shiftId: order.shiftId },
+                // Apply new Owner Wallet deduction if applicable
+                if (updatedOrder.type === 'owner' && (updatedOrder as any).ownerUserId) {
+                    await (tx as any).user.update({
+                        where: { id: (updatedOrder as any).ownerUserId },
+                        data: { walletBalance: { decrement: charges.finalTotal } }
+                    });
+
+                    await (tx as any).walletTransaction.create({
                         data: {
-                            ordersRevenue: { increment: diffRevenue },
-                            totalRevenue: { increment: diffRevenue }
+                            userId: (updatedOrder as any).ownerUserId,
+                            amount: -charges.finalTotal,
+                            note: `Order #${order.id.slice(0, 8)} edit application`,
+                            orderId: order.id,
+                            shiftId: order.shiftId
                         }
                     });
-                }
 
-                if (order.type === 'owner') {
-                    const ownerUserId = (order as any).ownerUserId as string | null;
-                    if (ownerUserId) {
-                        const diffFinal = charges.finalTotal - oldCharge.finalTotal;
-                        await (tx as any).user.update({
-                            where: { id: ownerUserId },
-                            data: { walletBalance: { decrement: diffFinal } }
-                        });
+                    // Create Payment record
+                    await tx.payment.create({
+                        data: {
+                            modeId: 'WALLET',
+                            amount: charges.finalTotal,
+                            referenceType: 'order',
+                            referenceId: order.id,
+                            shiftId: order.shiftId,
+                        }
+                    });
 
-                        await (tx as any).walletTransaction.create({
-                            data: {
-                                userId: ownerUserId,
-                                amount: -diffFinal,
-                                note: `Order #${order.id.slice(0, 8)} edit adjustment`,
-                                orderId: order.id,
-                                shiftId: order.shiftId
-                            }
-                        });
-                    }
+                    // Update ShiftStats Wallet
+                    await tx.shiftStats.update({
+                        where: { shiftId: order.shiftId },
+                        data: { paymentsWallet: { increment: charges.finalTotal } }
+                    });
                 }
             }
 

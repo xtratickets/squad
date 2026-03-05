@@ -46,4 +46,6 @@ router.post('/:id/resume', auth_middleware_1.authenticate, sessionController.res
 router.post('/:id/checkout', auth_middleware_1.authenticate, sessionController.checkoutSession);
 router.post('/:id/assign-owner', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)(['STAFF', 'OPERATION', 'ADMIN']), owner_controller_1.assignOwnerToSession);
 router.patch('/:id', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)(['OPERATION', 'ADMIN']), sessionController.updateSession);
+router.post('/:id/cancel', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)(['OPERATION', 'ADMIN']), sessionController.cancelSession);
+router.post('/:id/discount', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)(['OPERATION', 'ADMIN']), sessionController.updateSessionDiscount);
 exports.default = router;

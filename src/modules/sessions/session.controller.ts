@@ -390,3 +390,185 @@ export const checkoutSession = async (req: any, res: Response) => {
         res.status(500).json({ error: 'Internal server error' });
     }
 };
+
+export const cancelSession = async (req: any, res: Response) => {
+    const id = req.params.id as string;
+    const userId = req.user.userId;
+
+    try {
+        const session = await prisma.session.findUnique({
+            where: { id },
+            include: {
+                sessionCharge: true,
+                orders: { include: { orderCharge: true } }
+            }
+        });
+
+        if (!session) return res.status(404).json({ error: 'Session not found' });
+        if (session.status === 'cancelled') return res.status(400).json({ error: 'Session already cancelled' });
+
+        const result = await prisma.$transaction(async (tx) => {
+            // 1. If closed, revert ShiftStats and Wallet
+            if (session.status === 'closed' && session.sessionCharge) {
+                const charge = session.sessionCharge;
+                const shiftId = session.closedShiftId!;
+
+                // Revert ShiftStats Revenue
+                await tx.shiftStats.update({
+                    where: { shiftId },
+                    data: {
+                        sessionsRevenue: { decrement: charge.roomAmount },
+                        ordersRevenue: { decrement: charge.ordersAmount },
+                        totalRevenue: { decrement: (charge.finalTotal - charge.tip) },
+                        tipsTotal: { decrement: charge.tip },
+                    },
+                });
+
+                // Revert Owner Wallet if applicable
+                const ownerOrder = session.orders.find(o => o.type === 'owner' && o.ownerUserId);
+                if (ownerOrder?.ownerUserId) {
+                    await tx.user.update({
+                        where: { id: ownerOrder.ownerUserId },
+                        data: { walletBalance: { increment: charge.finalTotal } },
+                    });
+                    await tx.walletTransaction.create({
+                        data: {
+                            userId: ownerOrder.ownerUserId,
+                            amount: charge.finalTotal,
+                            note: `CANCELLATION Reversal: #${session.id.slice(0, 8)}`,
+                            shiftId: shiftId,
+                        } as any,
+                    });
+
+                    // Revert Wallet Payment record
+                    const walletMode = await tx.paymentMode.findFirst({
+                        where: { name: { equals: 'Wallet', mode: 'insensitive' } }
+                    });
+                    const payment = await tx.payment.findFirst({
+                        where: { referenceType: 'session', referenceId: id, modeId: walletMode?.id || 'none' }
+                    });
+                    if (payment) {
+                        await tx.payment.delete({ where: { id: payment.id } });
+                        await tx.shiftStats.update({
+                            where: { shiftId },
+                            data: { paymentsWallet: { decrement: payment.amount } }
+                        });
+                    }
+                }
+
+                await tx.sessionCharge.delete({ where: { sessionId: id } });
+            }
+
+            // 2. Set room to available
+            await tx.room.update({
+                where: { id: session.roomId },
+                data: { status: 'available' },
+            });
+
+            // 3. Update session status
+            return await tx.session.update({
+                where: { id },
+                data: { status: 'cancelled' },
+            });
+        });
+
+        await AuditService.log('Session', id, 'CANCEL', userId, session, result);
+        broadcast('session.cancelled', result);
+        broadcast('room.state_updated', { roomId: session.roomId, status: 'available' });
+
+        res.json(result);
+    } catch (error) {
+        logger.error(error, 'Error cancelling session');
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+export const updateSessionDiscount = async (req: any, res: Response) => {
+    const id = req.params.id as string;
+    const { discount } = req.body;
+    const userId = req.user.userId;
+
+    try {
+        const session = await prisma.session.findUnique({
+            where: { id },
+            include: { sessionCharge: true, orders: { include: { orderCharge: true } } }
+        });
+
+        if (!session || session.status !== 'closed' || !session.sessionCharge) {
+            return res.status(404).json({ error: 'Charged session not found' });
+        }
+
+        const oldCharge = session.sessionCharge;
+        const shiftId = session.closedShiftId!;
+        const endTime = session.endTime!;
+
+        const newCharges = await BillingService.computeSessionCharge(id, endTime, discount, oldCharge.tip);
+
+        const result = await prisma.$transaction(async (tx) => {
+            // Update SessionCharge
+            await tx.sessionCharge.update({
+                where: { sessionId: id },
+                data: {
+                    discount: newCharges.discount,
+                    serviceFee: newCharges.serviceFee,
+                    tax: newCharges.tax,
+                    finalTotal: newCharges.finalTotal,
+                } as any,
+            });
+
+            // Adjust ShiftStats Revenue
+            const diffRevenue = (newCharges.finalTotal - newCharges.tip) - (oldCharge.finalTotal - oldCharge.tip);
+            if (diffRevenue !== 0) {
+                await tx.shiftStats.update({
+                    where: { shiftId },
+                    data: { totalRevenue: { increment: diffRevenue } },
+                });
+            }
+
+            // If owner session, adjust wallet
+            const ownerOrder = session.orders.find(o => o.type === 'owner' && o.ownerUserId);
+            if (ownerOrder?.ownerUserId) {
+                const diffFinal = newCharges.finalTotal - oldCharge.finalTotal;
+                if (diffFinal !== 0) {
+                    await tx.user.update({
+                        where: { id: ownerOrder.ownerUserId },
+                        data: { walletBalance: { decrement: diffFinal } },
+                    });
+                    await tx.walletTransaction.create({
+                        data: {
+                            userId: ownerOrder.ownerUserId,
+                            amount: -diffFinal,
+                            note: `DISCOUNT Adjustment: #${session.id.slice(0, 8)}`,
+                            shiftId: shiftId,
+                        } as any,
+                    });
+
+                    const walletMode = await tx.paymentMode.findFirst({
+                        where: { name: { equals: 'Wallet', mode: 'insensitive' } }
+                    });
+                    // Adjust Wallet Payment record
+                    const payment = await tx.payment.findFirst({
+                        where: { referenceType: 'session', referenceId: id, modeId: walletMode?.id || 'none' }
+                    });
+                    if (payment) {
+                        await tx.payment.update({
+                            where: { id: payment.id },
+                            data: { amount: newCharges.finalTotal }
+                        });
+                        await tx.shiftStats.update({
+                            where: { shiftId },
+                            data: { paymentsWallet: { increment: diffFinal } }
+                        });
+                    }
+                }
+            }
+            return newCharges;
+        });
+
+        await AuditService.log('Session', id, 'UPDATE_DISCOUNT', userId, oldCharge, result);
+        res.json(result);
+    } catch (error) {
+        logger.error(error, 'Error updating session discount');
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};

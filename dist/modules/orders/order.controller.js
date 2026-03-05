@@ -334,7 +334,7 @@ const updateOrder = async (req, res) => {
 exports.updateOrder = updateOrder;
 const updateOrderItems = async (req, res) => {
     const id = req.params.id;
-    const { items } = req.body;
+    const { items, type, ownerUserId } = req.body;
     const userId = req.user.userId;
     try {
         const order = await prisma_service_1.prisma.order.findUnique({
@@ -359,6 +359,43 @@ const updateOrderItems = async (req, res) => {
                     });
                     await tx.stockMovement.create({
                         data: { productId: item.productId, qty: item.qty, type: 'add', reference: `order_${order.id}_edit_revert` }
+                    });
+                }
+                if (order.type === 'owner' && order.ownerUserId) {
+                    const oldCharge = order.orderCharge;
+                    await tx.user.update({
+                        where: { id: order.ownerUserId },
+                        data: { walletBalance: { increment: oldCharge.finalTotal } }
+                    });
+                    await tx.walletTransaction.create({
+                        data: {
+                            userId: order.ownerUserId,
+                            amount: oldCharge.finalTotal,
+                            note: `Order #${order.id.slice(0, 8)} edit revert`,
+                            orderId: order.id,
+                            shiftId: order.shiftId
+                        }
+                    });
+                    const payment = await tx.payment.findFirst({
+                        where: { referenceType: 'order', referenceId: id, modeId: 'WALLET' }
+                    });
+                    if (payment) {
+                        await tx.payment.delete({ where: { id: payment.id } });
+                        await tx.shiftStats.update({
+                            where: { shiftId: order.shiftId },
+                            data: { paymentsWallet: { decrement: payment.amount } }
+                        });
+                    }
+                }
+                if (order.orderCharge) {
+                    const charge = order.orderCharge;
+                    await tx.shiftStats.update({
+                        where: { shiftId: order.shiftId },
+                        data: {
+                            ordersRevenue: { decrement: charge.itemsTotal - charge.discount },
+                            totalRevenue: { decrement: charge.itemsTotal - charge.discount },
+                            tipsTotal: { decrement: charge.tip },
+                        },
                     });
                 }
             }
@@ -389,9 +426,15 @@ const updateOrderItems = async (req, res) => {
                     });
                 }
             }
+            const updatedOrder = await tx.order.update({
+                where: { id },
+                data: {
+                    type: type || order.type,
+                    ownerUserId: type === 'owner' ? (ownerUserId || order.ownerUserId) : null,
+                }
+            });
             if (order.status === 'approved') {
-                const charges = await billing_service_1.BillingService.computeOrderCharge(id, discountAmount, tip);
-                const oldCharge = order.orderCharge;
+                const charges = await billing_service_1.BillingService.computeOrderCharge(id, discountAmount, tip, tx);
                 await tx.orderCharge.update({
                     where: { orderId: id },
                     data: {
@@ -403,34 +446,41 @@ const updateOrderItems = async (req, res) => {
                         finalTotal: charges.finalTotal
                     }
                 });
-                const diffRevenue = (charges.itemsTotal - charges.discount) - (oldCharge.itemsTotal - oldCharge.discount);
-                if (diffRevenue !== 0) {
-                    await tx.shiftStats.update({
-                        where: { shiftId: order.shiftId },
+                await tx.shiftStats.update({
+                    where: { shiftId: order.shiftId },
+                    data: {
+                        ordersRevenue: { increment: charges.itemsTotal - charges.discount },
+                        totalRevenue: { increment: charges.itemsTotal - charges.discount },
+                        tipsTotal: { increment: charges.tip },
+                    }
+                });
+                if (updatedOrder.type === 'owner' && updatedOrder.ownerUserId) {
+                    await tx.user.update({
+                        where: { id: updatedOrder.ownerUserId },
+                        data: { walletBalance: { decrement: charges.finalTotal } }
+                    });
+                    await tx.walletTransaction.create({
                         data: {
-                            ordersRevenue: { increment: diffRevenue },
-                            totalRevenue: { increment: diffRevenue }
+                            userId: updatedOrder.ownerUserId,
+                            amount: -charges.finalTotal,
+                            note: `Order #${order.id.slice(0, 8)} edit application`,
+                            orderId: order.id,
+                            shiftId: order.shiftId
                         }
                     });
-                }
-                if (order.type === 'owner') {
-                    const ownerUserId = order.ownerUserId;
-                    if (ownerUserId) {
-                        const diffFinal = charges.finalTotal - oldCharge.finalTotal;
-                        await tx.user.update({
-                            where: { id: ownerUserId },
-                            data: { walletBalance: { decrement: diffFinal } }
-                        });
-                        await tx.walletTransaction.create({
-                            data: {
-                                userId: ownerUserId,
-                                amount: -diffFinal,
-                                note: `Order #${order.id.slice(0, 8)} edit adjustment`,
-                                orderId: order.id,
-                                shiftId: order.shiftId
-                            }
-                        });
-                    }
+                    await tx.payment.create({
+                        data: {
+                            modeId: 'WALLET',
+                            amount: charges.finalTotal,
+                            referenceType: 'order',
+                            referenceId: order.id,
+                            shiftId: order.shiftId,
+                        }
+                    });
+                    await tx.shiftStats.update({
+                        where: { shiftId: order.shiftId },
+                        data: { paymentsWallet: { increment: charges.finalTotal } }
+                    });
                 }
             }
             return await tx.order.findUnique({

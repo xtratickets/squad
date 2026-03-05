@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.checkoutSession = exports.updateSession = exports.resumeSession = exports.pauseSession = exports.endSession = exports.startSession = exports.getSession = void 0;
+exports.updateSessionDiscount = exports.cancelSession = exports.checkoutSession = exports.updateSession = exports.resumeSession = exports.pauseSession = exports.endSession = exports.startSession = exports.getSession = void 0;
 const prisma_service_1 = require("../../services/prisma.service");
 const billing_service_1 = require("../../services/billing.service");
 const logger_1 = require("../../utils/logger");
@@ -341,3 +341,159 @@ const checkoutSession = async (req, res) => {
     }
 };
 exports.checkoutSession = checkoutSession;
+const cancelSession = async (req, res) => {
+    const id = req.params.id;
+    const userId = req.user.userId;
+    try {
+        const session = await prisma_service_1.prisma.session.findUnique({
+            where: { id },
+            include: {
+                sessionCharge: true,
+                orders: { include: { orderCharge: true } }
+            }
+        });
+        if (!session)
+            return res.status(404).json({ error: 'Session not found' });
+        if (session.status === 'cancelled')
+            return res.status(400).json({ error: 'Session already cancelled' });
+        const result = await prisma_service_1.prisma.$transaction(async (tx) => {
+            if (session.status === 'closed' && session.sessionCharge) {
+                const charge = session.sessionCharge;
+                const shiftId = session.closedShiftId;
+                await tx.shiftStats.update({
+                    where: { shiftId },
+                    data: {
+                        sessionsRevenue: { decrement: charge.roomAmount },
+                        ordersRevenue: { decrement: charge.ordersAmount },
+                        totalRevenue: { decrement: (charge.finalTotal - charge.tip) },
+                        tipsTotal: { decrement: charge.tip },
+                    },
+                });
+                const ownerOrder = session.orders.find(o => o.type === 'owner' && o.ownerUserId);
+                if (ownerOrder?.ownerUserId) {
+                    await tx.user.update({
+                        where: { id: ownerOrder.ownerUserId },
+                        data: { walletBalance: { increment: charge.finalTotal } },
+                    });
+                    await tx.walletTransaction.create({
+                        data: {
+                            userId: ownerOrder.ownerUserId,
+                            amount: charge.finalTotal,
+                            note: `CANCELLATION Reversal: #${session.id.slice(0, 8)}`,
+                            shiftId: shiftId,
+                        },
+                    });
+                    const walletMode = await tx.paymentMode.findFirst({
+                        where: { name: { equals: 'Wallet', mode: 'insensitive' } }
+                    });
+                    const payment = await tx.payment.findFirst({
+                        where: { referenceType: 'session', referenceId: id, modeId: walletMode?.id || 'none' }
+                    });
+                    if (payment) {
+                        await tx.payment.delete({ where: { id: payment.id } });
+                        await tx.shiftStats.update({
+                            where: { shiftId },
+                            data: { paymentsWallet: { decrement: payment.amount } }
+                        });
+                    }
+                }
+                await tx.sessionCharge.delete({ where: { sessionId: id } });
+            }
+            await tx.room.update({
+                where: { id: session.roomId },
+                data: { status: 'available' },
+            });
+            return await tx.session.update({
+                where: { id },
+                data: { status: 'cancelled' },
+            });
+        });
+        await audit_service_1.AuditService.log('Session', id, 'CANCEL', userId, session, result);
+        (0, socket_1.broadcast)('session.cancelled', result);
+        (0, socket_1.broadcast)('room.state_updated', { roomId: session.roomId, status: 'available' });
+        res.json(result);
+    }
+    catch (error) {
+        logger_1.logger.error(error, 'Error cancelling session');
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+exports.cancelSession = cancelSession;
+const updateSessionDiscount = async (req, res) => {
+    const id = req.params.id;
+    const { discount } = req.body;
+    const userId = req.user.userId;
+    try {
+        const session = await prisma_service_1.prisma.session.findUnique({
+            where: { id },
+            include: { sessionCharge: true, orders: { include: { orderCharge: true } } }
+        });
+        if (!session || session.status !== 'closed' || !session.sessionCharge) {
+            return res.status(404).json({ error: 'Charged session not found' });
+        }
+        const oldCharge = session.sessionCharge;
+        const shiftId = session.closedShiftId;
+        const endTime = session.endTime;
+        const newCharges = await billing_service_1.BillingService.computeSessionCharge(id, endTime, discount, oldCharge.tip);
+        const result = await prisma_service_1.prisma.$transaction(async (tx) => {
+            await tx.sessionCharge.update({
+                where: { sessionId: id },
+                data: {
+                    discount: newCharges.discount,
+                    serviceFee: newCharges.serviceFee,
+                    tax: newCharges.tax,
+                    finalTotal: newCharges.finalTotal,
+                },
+            });
+            const diffRevenue = (newCharges.finalTotal - newCharges.tip) - (oldCharge.finalTotal - oldCharge.tip);
+            if (diffRevenue !== 0) {
+                await tx.shiftStats.update({
+                    where: { shiftId },
+                    data: { totalRevenue: { increment: diffRevenue } },
+                });
+            }
+            const ownerOrder = session.orders.find(o => o.type === 'owner' && o.ownerUserId);
+            if (ownerOrder?.ownerUserId) {
+                const diffFinal = newCharges.finalTotal - oldCharge.finalTotal;
+                if (diffFinal !== 0) {
+                    await tx.user.update({
+                        where: { id: ownerOrder.ownerUserId },
+                        data: { walletBalance: { decrement: diffFinal } },
+                    });
+                    await tx.walletTransaction.create({
+                        data: {
+                            userId: ownerOrder.ownerUserId,
+                            amount: -diffFinal,
+                            note: `DISCOUNT Adjustment: #${session.id.slice(0, 8)}`,
+                            shiftId: shiftId,
+                        },
+                    });
+                    const walletMode = await tx.paymentMode.findFirst({
+                        where: { name: { equals: 'Wallet', mode: 'insensitive' } }
+                    });
+                    const payment = await tx.payment.findFirst({
+                        where: { referenceType: 'session', referenceId: id, modeId: walletMode?.id || 'none' }
+                    });
+                    if (payment) {
+                        await tx.payment.update({
+                            where: { id: payment.id },
+                            data: { amount: newCharges.finalTotal }
+                        });
+                        await tx.shiftStats.update({
+                            where: { shiftId },
+                            data: { paymentsWallet: { increment: diffFinal } }
+                        });
+                    }
+                }
+            }
+            return newCharges;
+        });
+        await audit_service_1.AuditService.log('Session', id, 'UPDATE_DISCOUNT', userId, oldCharge, result);
+        res.json(result);
+    }
+    catch (error) {
+        logger_1.logger.error(error, 'Error updating session discount');
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+exports.updateSessionDiscount = updateSessionDiscount;

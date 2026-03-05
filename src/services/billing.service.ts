@@ -1,6 +1,10 @@
 import { prisma } from './prisma.service';
 
 export class BillingService {
+    static round(val: number): number {
+        return Math.round(val * 100) / 100;
+    }
+
     static async computeSessionCharge(sessionId: string, endTime: Date, discountAmount: number = 0, tip: number = 0) {
         const session = await prisma.session.findUnique({
             where: { id: sessionId },
@@ -34,7 +38,7 @@ export class BillingService {
         const billableMinutes = Math.max(Math.ceil(billableMs / 60000), session.room.minMinutes);
 
         // Room amount
-        const roomAmount = (billableMinutes / 60) * session.room.pricePerHour;
+        const roomAmount = this.round((billableMinutes / 60) * session.room.pricePerHour);
 
         // Split orders into owner and non-owner
         const ownerOrders = session.orders.filter(o => o.type === 'owner');
@@ -55,9 +59,9 @@ export class BillingService {
         });
 
         // Calculate fees separately
-        const subtotal = roomAmount + regularOrdersAmount + ownerOrdersAmount;
-        const discount = Math.min(discountAmount, subtotal);
-        const discountedSubtotal = subtotal - discount;
+        const subtotal = this.round(roomAmount + regularOrdersAmount + ownerOrdersAmount);
+        const discount = this.round(Math.min(discountAmount, subtotal));
+        const discountedSubtotal = this.round(subtotal - discount);
 
         // Ratio for discount allocation (optional, but let's keep it simple and apply percentages to totals)
         // Actually, the user wants separated fees. 
@@ -74,14 +78,14 @@ export class BillingService {
         let orderFeePercent = feeConfig?.orderServiceFeePercent || 0;
         let ownerFeePercent = feeConfig?.ownerServiceFeePercent || 0;
 
-        const roomServiceFee = (discountedRoomAmount * roomFeePercent) / 100;
-        const regularOrdersServiceFee = (discountedRegularOrdersAmount * orderFeePercent) / 100;
-        const ownerOrdersServiceFee = (discountedOwnerOrdersAmount * ownerFeePercent) / 100;
+        const roomServiceFee = this.round((discountedRoomAmount * roomFeePercent) / 100);
+        const regularOrdersServiceFee = this.round((discountedRegularOrdersAmount * orderFeePercent) / 100);
+        const ownerOrdersServiceFee = this.round((discountedOwnerOrdersAmount * ownerFeePercent) / 100);
 
-        const serviceFee = roomServiceFee + regularOrdersServiceFee + ownerOrdersServiceFee;
-        const tax = (discountedSubtotal * (feeConfig?.taxPercent || 0)) / 100;
+        const serviceFee = this.round(roomServiceFee + regularOrdersServiceFee + ownerOrdersServiceFee);
+        const tax = this.round((discountedSubtotal * (feeConfig?.taxPercent || 0)) / 100);
 
-        const finalTotal = discountedSubtotal + serviceFee + tax + tip;
+        const finalTotal = this.round(discountedSubtotal + serviceFee + tax + tip);
 
         const durationMinutes = Math.ceil(billableMs / 60000);
 
@@ -90,34 +94,34 @@ export class BillingService {
             billableMinutes,
             hourlyPrice: session.room.pricePerHour,
             roomAmount,
-            ordersAmount: regularOrdersAmount + ownerOrdersAmount,
+            ordersAmount: this.round(regularOrdersAmount + ownerOrdersAmount),
             discount,
             serviceFee,
             tax,
-            tip,
+            tip: this.round(tip),
             finalTotal,
         };
     }
 
-    static async computeOrderCharge(orderId: string, discountAmount: number = 0, tip: number = 0) {
-        const order = await prisma.order.findUnique({
+    static async computeOrderCharge(orderId: string, discountAmount: number = 0, tip: number = 0, tx: any = prisma) {
+        const order = await tx.order.findUnique({
             where: { id: orderId }
         });
 
         if (!order) throw new Error('Order not found');
 
-        const orderItems = await prisma.orderItem.findMany({
+        const orderItems = await tx.orderItem.findMany({
             where: { orderId },
         });
 
-        const itemsTotal = orderItems.reduce((sum, item) => sum + item.total, 0);
+        const itemsTotal = this.round(orderItems.reduce((sum: any, item: any) => sum + item.total, 0));
 
-        const feeConfig = await (prisma as any).feeConfig.findUnique({
+        const feeConfig = await (tx as any).feeConfig.findUnique({
             where: { id: 'default' },
         });
 
-        const discount = Math.min(discountAmount, itemsTotal);
-        const discountedTotal = itemsTotal - discount;
+        const discount = this.round(Math.min(discountAmount, itemsTotal));
+        const discountedTotal = this.round(itemsTotal - discount);
 
         // Determine fee percent based on type
         let feePercent = 0;
@@ -130,16 +134,16 @@ export class BillingService {
             feePercent = feeConfig?.orderServiceFeePercent || 0;
         }
 
-        const serviceFee = (discountedTotal * feePercent) / 100;
-        const tax = (discountedTotal * (feeConfig?.taxPercent || 0)) / 100;
-        const finalTotal = discountedTotal + serviceFee + tax + tip;
+        const serviceFee = this.round((discountedTotal * feePercent) / 100);
+        const tax = this.round((discountedTotal * (feeConfig?.taxPercent || 0)) / 100);
+        const finalTotal = this.round(discountedTotal + serviceFee + tax + tip);
 
         return {
             itemsTotal,
             discount,
             serviceFee,
             tax,
-            tip,
+            tip: this.round(tip),
             finalTotal,
         };
     }

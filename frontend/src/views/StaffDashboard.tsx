@@ -9,7 +9,7 @@ import {
     CheckCircle, XCircle, ArrowRight, Zap,
     Trash2, AlertCircle, Package, X, CreditCard, Plus,
     ChevronDown, ChevronUp, History as HistoryIcon,
-    Printer, Camera, RefreshCw, Pause, Play, Receipt
+    Printer, Camera, RefreshCw, Pause, Play, Receipt, Edit3
 } from 'lucide-react';
 import { roomService } from '../services/room.service';
 import ShiftReport from '../components/common/ShiftReport';
@@ -44,7 +44,6 @@ import Webcam from 'react-webcam';
 
 interface CartItem { productId: string; name: string; price: number; qty: number; }
 
-interface CartItem { productId: string; name: string; price: number; qty: number; }
 interface OrderSummary {
     id: string; type: string; status: string; shiftId: string;
     roomId?: string; sessionId?: string;
@@ -106,6 +105,32 @@ function getGreeting() {
 
 const fmt = (n: number) => n.toFixed(2);
 
+const playNotificationSound = () => {
+    try {
+        const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+        if (!AudioContext) return;
+        const ctx = new AudioContext();
+        const osc = ctx.createOscillator();
+        const gainNode = ctx.createGain();
+
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(880, ctx.currentTime); // A5
+        osc.frequency.exponentialRampToValueAtTime(1760, ctx.currentTime + 0.1); // Up to A6
+
+        gainNode.gain.setValueAtTime(0, ctx.currentTime);
+        gainNode.gain.linearRampToValueAtTime(0.3, ctx.currentTime + 0.05);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
+
+        osc.connect(gainNode);
+        gainNode.connect(ctx.destination);
+
+        osc.start();
+        osc.stop(ctx.currentTime + 0.5);
+    } catch (e) {
+        console.error('Audio play failed', e);
+    }
+};
+
 
 
 // ─── Session Timer badge ──────────────────────────────────────────
@@ -130,6 +155,44 @@ const SessionTimer: React.FC<{
         }}>
             <Clock size={11} /> {elapsed} {isPaused && <span style={{ fontSize: '10px', opacity: 0.7 }}>(PAUSED)</span>}
         </div>
+    );
+};
+
+// ─── Confirm Modal ───────────────────────────────────────────────
+
+const ConfirmModal: React.FC<{
+    isOpen: boolean;
+    onClose: () => void;
+    onConfirm: () => void;
+    title: string;
+    message: string;
+    confirmText?: string;
+    cancelText?: string;
+    type?: 'primary' | 'danger';
+}> = ({ isOpen, onClose, onConfirm, title, message, confirmText = 'Confirm', cancelText = 'Cancel', type = 'primary' }) => {
+    return (
+        <Modal isOpen={isOpen} title={title} onClose={onClose} maxWidth="400px">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                <div style={{ color: 'var(--text-muted)', fontSize: '14px', lineHeight: '1.5' }}>
+                    {message}
+                </div>
+                <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                    <Button variant="secondary" onClick={onClose} style={{ flex: 1 }}>
+                        {cancelText}
+                    </Button>
+                    <Button
+                        variant={type === 'danger' ? 'danger' : 'primary'}
+                        onClick={() => {
+                            onConfirm();
+                            onClose();
+                        }}
+                        style={{ flex: 1 }}
+                    >
+                        {confirmText}
+                    </Button>
+                </div>
+            </div>
+        </Modal>
     );
 };
 
@@ -494,11 +557,13 @@ interface ReceiptModalProps {
     onConfirm: () => void;
     onClose: () => void;
     onAddOrder: () => void;
+    onEditOrder?: (order: any) => void;
     isAdminViewing?: boolean;
     staffName: string;
+    userRole?: string;
 }
 
-const ReceiptModal: React.FC<ReceiptModalProps> = ({ sessionId, roomName, shiftId, modes, onConfirm, onClose, onAddOrder, isAdminViewing, staffName }) => {
+const ReceiptModal: React.FC<ReceiptModalProps> = ({ sessionId, roomName, shiftId, modes, onConfirm, onClose, onAddOrder, onEditOrder, isAdminViewing, staffName, userRole }) => {
     const [data, setData] = useState<{ session: SessionDetail; billing: SessionBilling } | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -510,6 +575,10 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ sessionId, roomName, shiftI
     ]);
     const [activeWebcamPaymentId, setActiveWebcamPaymentId] = useState<string | null>(null);
     const [submitting, setSubmitting] = useState(false);
+    const [extraDiscountInput, setExtraDiscountInput] = useState('');
+    const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+
+    const isOperation = userRole === 'OPERATION' || userRole === 'ADMIN';
 
     // Tips & Owners state
     const [tipInput, setTipInput] = useState<string>('');
@@ -644,6 +713,36 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ sessionId, roomName, shiftI
         }
     };
 
+    const handleCancelSession = async () => {
+        try {
+            setSubmitting(true);
+            await adminService.cancelSession(sessionId);
+            toast.success('Session cancelled');
+            onConfirm();
+        } catch (err) {
+            toast.error(errMsg(err, 'Failed to cancel session'));
+        } finally {
+            setSubmitting(false);
+            setShowCancelConfirm(false);
+        }
+    };
+
+    const handleApplyExtraDiscount = async () => {
+        const disc = parseFloat(extraDiscountInput);
+        if (isNaN(disc) || disc < 0) return toast.error('Invalid discount amount');
+        try {
+            setSubmitting(true);
+            await adminService.updateSessionDiscount(sessionId, disc);
+            toast.success('Discount updated');
+            void loadData(); // Reload to see new totals
+            setExtraDiscountInput('');
+        } catch (err) {
+            toast.error(errMsg(err, 'Failed to update discount'));
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
     const b = data?.billing;
     const s = data?.session;
 
@@ -700,6 +799,47 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ sessionId, roomName, shiftI
                     </button>
                 </div>
 
+                {isOperation && step === 'receipt' && (
+                    <div className="no-print" style={{ padding: '12px 24px', background: 'rgba(255,82,82,0.05)', borderBottom: '1px solid var(--border)', display: 'flex', gap: '12px', alignItems: 'center' }}>
+                        <button
+                            onClick={() => setShowCancelConfirm(true)}
+                            disabled={submitting}
+                            style={{
+                                background: 'rgba(255,82,82,0.1)', color: 'var(--danger)', border: '1px solid rgba(255,82,82,0.2)',
+                                padding: '6px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: '700', cursor: 'pointer',
+                                display: 'flex', alignItems: 'center', gap: '6px'
+                            }}
+                        >
+                            <Trash2 size={14} /> Cancel Session
+                        </button>
+                        {data?.session.status === 'closed' && (
+                            <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                <input
+                                    type="number"
+                                    placeholder="Extra Disc."
+                                    value={extraDiscountInput}
+                                    onChange={e => setExtraDiscountInput(e.target.value)}
+                                    style={{
+                                        width: '90px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)',
+                                        borderRadius: '6px', padding: '6px 10px', fontSize: '12px', color: 'var(--text)'
+                                    }}
+                                />
+                                <button
+                                    onClick={handleApplyExtraDiscount}
+                                    disabled={submitting || !extraDiscountInput}
+                                    style={{
+                                        background: 'var(--primary)', color: '#000', border: 'none',
+                                        padding: '6px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: '700',
+                                        cursor: submitting || !extraDiscountInput ? 'not-allowed' : 'pointer'
+                                    }}
+                                >
+                                    Apply
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                )}
+
                 {/* Print Header */}
                 <div className="print-only" style={{ display: 'none', textAlign: 'center', padding: '20px 0 10px 0' }}>
                     <div style={{ fontSize: '28px', fontWeight: '900', letterSpacing: '2px', marginBottom: '4px' }}>SQUAD POS</div>
@@ -749,12 +889,27 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ sessionId, roomName, shiftI
                             </div>
 
                             {/* Orders Section */}
-                            {s!.orders.length > 0 && (
+                            {s!.orders.filter(o => o.status !== 'cancelled').length > 0 && (
                                 <div style={{ marginBottom: '20px' }}>
                                     <div style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1.5px', marginBottom: '10px', fontWeight: '700' }}>Orders Breakdown</div>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                        {s!.orders.map(order => (
-                                            <div key={order.id} style={{ marginBottom: '4px' }}>
+                                        {s!.orders.filter(o => o.status !== 'cancelled').map(order => (
+                                            <div key={order.id} style={{ marginBottom: '4px', position: 'relative' }}>
+                                                {onEditOrder && !isAdminViewing && (
+                                                    <button
+                                                        onClick={() => onEditOrder(order)}
+                                                        style={{
+                                                            position: 'absolute', right: '-24px', top: '0',
+                                                            background: 'none', border: 'none', color: 'var(--primary)',
+                                                            cursor: 'pointer', padding: '4px', opacity: 0.6
+                                                        }}
+                                                        onMouseEnter={e => e.currentTarget.style.opacity = '1'}
+                                                        onMouseLeave={e => e.currentTarget.style.opacity = '0.6'}
+                                                        title="Edit Order"
+                                                    >
+                                                        <Edit3 size={14} />
+                                                    </button>
+                                                )}
                                                 {order.items.map(item => (
                                                     <div key={item.id} className="receipt-row" style={{ fontSize: '13px' }}>
                                                         <div style={{ flex: 1 }}>
@@ -886,152 +1041,185 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ sessionId, roomName, shiftI
                         </Button>
                     </div>
                 )}
-                {data && step === 'checkout' && (
-                    <form onSubmit={(e) => { void handleCheckout(e); }} style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '0 28px 24px 28px' }}>
-                        {/* Total reminder */}
-                        <div style={{ padding: '16px', borderRadius: '10px', background: 'rgba(0,230,118,0.05)', border: '1px solid rgba(0,230,118,0.2)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>Amount due</span>
-                            <span style={{ fontSize: '24px', fontWeight: '800', color: 'var(--primary)' }}>EGP {fmt(finalDue)}</span>
-                        </div>
 
-                        {/* Optional Adjustments: Tip & Owner */}
-                        <div style={{ display: 'flex', gap: '12px' }}>
-                            <div style={{ flex: 1 }}>
-                                <label style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px', display: 'block', textTransform: 'uppercase', letterSpacing: '1px' }}>Assign Owner (Optional)</label>
-                                <select
-                                    value={selectedOwnerId}
-                                    onChange={e => setSelectedOwnerId(e.target.value)}
-                                    style={{ width: '100%', padding: '12px', background: 'rgba(255,255,255,0.06)', border: '1px solid var(--border)', color: 'var(--text)', borderRadius: '10px' }}
+                {showCancelConfirm && (
+                    <div style={{
+                        position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.8)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100,
+                        backdropFilter: 'blur(4px)'
+                    }}>
+                        <GlassPanel style={{ width: '320px', padding: '24px', textAlign: 'center' }}>
+                            <AlertCircle size={40} color="var(--danger)" style={{ marginBottom: '16px' }} />
+                            <h3 style={{ margin: '0 0 12px 0' }}>Cancel Session?</h3>
+                            <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '24px' }}>
+                                This will invalidate the session and revert any revenue recorded. This action cannot be undone.
+                            </p>
+                            <div style={{ display: 'flex', gap: '12px' }}>
+                                <button
+                                    onClick={() => setShowCancelConfirm(false)}
+                                    style={{ flex: 1, background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', padding: '10px', borderRadius: '8px', cursor: 'pointer', color: 'var(--text)' }}
                                 >
-                                    <option value="" style={{ background: '#1a1a1a' }}>-- Select Owner --</option>
-                                    {owners.map(o => (
-                                        <option key={o.id} value={o.id} style={{ background: '#1a1a1a' }}>{o.username}</option>
-                                    ))}
-                                </select>
+                                    Back
+                                </button>
+                                <button
+                                    onClick={handleCancelSession}
+                                    disabled={submitting}
+                                    style={{ flex: 1, background: 'var(--danger)', border: 'none', padding: '10px', borderRadius: '8px', cursor: 'pointer', color: '#fff', fontWeight: '700' }}
+                                >
+                                    {submitting ? 'Cancelling...' : 'Confirm'}
+                                </button>
                             </div>
-                            <div style={{ width: '140px' }}>
-                                <label style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px', display: 'block', textTransform: 'uppercase', letterSpacing: '1px' }}>Explicit Tip</label>
-                                <div style={{ position: 'relative' }}>
-                                    <input
-                                        type="number" step="0.01" min="0"
-                                        placeholder="0.00"
-                                        value={tipInput}
-                                        onChange={e => {
-                                            setTipInput(e.target.value);
-                                            recalculateAmount(data.billing, promoDiscount, parseFloat(e.target.value || '0'));
-                                        }}
-                                        style={{ width: '100%', padding: '12px', paddingLeft: '45px', background: 'rgba(255,171,0,0.05)', border: '1px solid rgba(255,171,0,0.3)', color: '#ffab00', borderRadius: '10px', boxSizing: 'border-box' }}
-                                    />
-                                    <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#ffab00', fontSize: '13px' }}>EGP</span>
-                                </div>
+                        </GlassPanel>
+                    </div>
+                )}
+
+                {
+                    data && step === 'checkout' && (
+                        <form onSubmit={(e) => { void handleCheckout(e); }} style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '0 28px 24px 28px' }}>
+                            {/* Total reminder */}
+                            <div style={{ padding: '16px', borderRadius: '10px', background: 'rgba(0,230,118,0.05)', border: '1px solid rgba(0,230,118,0.2)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>Amount due</span>
+                                <span style={{ fontSize: '24px', fontWeight: '800', color: 'var(--primary)' }}>EGP {fmt(finalDue)}</span>
                             </div>
-                        </div>
 
-                        {/* Payment Splits - Only show if NO owner is selected */}
-                        {!selectedOwnerId ? (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <label style={{ fontSize: '11px', color: 'var(--text-muted)' }}>PAYMENT SPLITS</label>
-                                    <button type="button" onClick={() => {
-                                        const computedDue = computeFinalDue() + parseFloat(tipInput || '0');
-                                        const remaining = Math.max(0, computedDue - currentTotalPaid);
-                                        setPayments([...payments, { id: Date.now().toString(), modeId: modes[0]?.id ?? '', amount: remaining > 0 ? remaining.toFixed(2) : '' }]);
-                                    }} style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                        <Plus size={14} /> Add Mode
-                                    </button>
+                            {/* Optional Adjustments: Tip & Owner */}
+                            <div style={{ display: 'flex', gap: '12px' }}>
+                                <div style={{ flex: 1 }}>
+                                    <label style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px', display: 'block', textTransform: 'uppercase', letterSpacing: '1px' }}>Assign Owner (Optional)</label>
+                                    <select
+                                        value={selectedOwnerId}
+                                        onChange={e => setSelectedOwnerId(e.target.value)}
+                                        style={{ width: '100%', padding: '12px', background: 'rgba(255,255,255,0.06)', border: '1px solid var(--border)', color: 'var(--text)', borderRadius: '10px' }}
+                                    >
+                                        <option value="" style={{ background: '#1a1a1a' }}>-- Select Owner --</option>
+                                        {owners.map(o => (
+                                            <option key={o.id} value={o.id} style={{ background: '#1a1a1a' }}>{o.username}</option>
+                                        ))}
+                                    </select>
                                 </div>
-
-                                {payments.map(payment => (
-                                    <div key={payment.id} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-                                        <select
-                                            value={payment.modeId}
-                                            onChange={e => setPayments(prev => prev.map(p => p.id === payment.id ? { ...p, modeId: e.target.value } : p))}
-                                            style={{ flex: 1, padding: '12px', background: 'rgba(255,255,255,0.06)', border: '1px solid var(--border)', color: 'var(--text)', borderRadius: '10px' }}
-                                        >
-                                            {modes.filter(m => m.active).map(m => (
-                                                <option key={m.id} value={m.id} style={{ background: '#1a1a1a' }}>{m.name}</option>
-                                            ))}
-                                        </select>
-                                        <div style={{ flex: 1, position: 'relative' }}>
-                                            <input
-                                                type="number" step="0.01" required
-                                                placeholder="0.00"
-                                                value={payment.amount}
-                                                onChange={e => setPayments(prev => prev.map(p => p.id === payment.id ? { ...p, amount: e.target.value } : p))}
-                                                style={{ width: '100%', padding: '12px', paddingLeft: '45px', background: 'rgba(255,255,255,0.06)', border: '1px solid var(--border)', color: 'var(--text)', borderRadius: '10px', boxSizing: 'border-box' }}
-                                            />
-                                            <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', fontSize: '13px' }}>EGP</span>
-                                        </div>
-                                        {modes.find(m => m.id === payment.modeId)?.name.match(/visa|instapay/i) && (
-                                            <button type="button" onClick={() => setActiveWebcamPaymentId(payment.id)} title={payment.receiptUrl ? "Receipt captured" : "Capture receipt photo"} style={{ background: payment.receiptUrl ? 'rgba(0,230,118,0.1)' : 'rgba(255,255,255,0.06)', border: `1px solid ${payment.receiptUrl ? 'rgba(0,230,118,0.3)' : 'var(--border)'}`, color: payment.receiptUrl ? 'var(--primary)' : 'var(--text-muted)', borderRadius: '10px', width: '42px', height: '42.5px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                                                <Camera size={18} strokeWidth={2.5} />
-                                            </button>
-                                        )}
-                                        {payments.length > 1 && (
-                                            <button type="button" onClick={() => setPayments(prev => prev.filter(p => p.id !== payment.id))} style={{ background: 'rgba(255,82,82,0.1)', border: 'none', color: 'var(--danger)', borderRadius: '10px', width: '42px', height: '42.5px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                                <Trash2 size={16} />
-                                            </button>
-                                        )}
+                                <div style={{ width: '140px' }}>
+                                    <label style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px', display: 'block', textTransform: 'uppercase', letterSpacing: '1px' }}>Explicit Tip</label>
+                                    <div style={{ position: 'relative' }}>
+                                        <input
+                                            type="number" step="0.01" min="0"
+                                            placeholder="0.00"
+                                            value={tipInput}
+                                            onChange={e => {
+                                                setTipInput(e.target.value);
+                                                recalculateAmount(data.billing, promoDiscount, parseFloat(e.target.value || '0'));
+                                            }}
+                                            style={{ width: '100%', padding: '12px', paddingLeft: '45px', background: 'rgba(255,171,0,0.05)', border: '1px solid rgba(255,171,0,0.3)', color: '#ffab00', borderRadius: '10px', boxSizing: 'border-box' }}
+                                        />
+                                        <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#ffab00', fontSize: '13px' }}>EGP</span>
                                     </div>
-                                ))}
-                            </div>
-                        ) : (
-                            <div style={{ padding: '20px', borderRadius: '12px', background: 'rgba(0,230,118,0.05)', border: '1px solid rgba(0,230,118,0.2)', textAlign: 'center' }}>
-                                <div style={{ color: 'var(--primary)', fontWeight: '700', fontSize: '15px' }}>Owner Tab Charge</div>
-                                <div style={{ color: 'var(--text-muted)', fontSize: '13px', marginTop: '4px' }}>
-                                    Total will be deducted from owner's balance. No payment modes required.
                                 </div>
                             </div>
-                        )}
 
-                        {/* Balance Remaining / Tip Notice */}
-                        <div style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            {currentTotalPaid < finalDue ? (
-                                <>
-                                    <AlertCircle size={14} color="#ffab00" />
-                                    <span style={{ color: '#ffab00' }}>Remaining balance to allocate: EGP {(finalDue - currentTotalPaid).toFixed(2)}</span>
-                                </>
+                            {/* Payment Splits - Only show if NO owner is selected */}
+                            {!selectedOwnerId ? (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <label style={{ fontSize: '11px', color: 'var(--text-muted)' }}>PAYMENT SPLITS</label>
+                                        <button type="button" onClick={() => {
+                                            const computedDue = computeFinalDue() + parseFloat(tipInput || '0');
+                                            const remaining = Math.max(0, computedDue - currentTotalPaid);
+                                            setPayments([...payments, { id: Date.now().toString(), modeId: modes[0]?.id ?? '', amount: remaining > 0 ? remaining.toFixed(2) : '' }]);
+                                        }} style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                            <Plus size={14} /> Add Mode
+                                        </button>
+                                    </div>
+
+                                    {payments.map(payment => (
+                                        <div key={payment.id} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                                            <select
+                                                value={payment.modeId}
+                                                onChange={e => setPayments(prev => prev.map(p => p.id === payment.id ? { ...p, modeId: e.target.value } : p))}
+                                                style={{ flex: 1, padding: '12px', background: 'rgba(255,255,255,0.06)', border: '1px solid var(--border)', color: 'var(--text)', borderRadius: '10px' }}
+                                            >
+                                                {modes.filter(m => m.active).map(m => (
+                                                    <option key={m.id} value={m.id} style={{ background: '#1a1a1a' }}>{m.name}</option>
+                                                ))}
+                                            </select>
+                                            <div style={{ flex: 1, position: 'relative' }}>
+                                                <input
+                                                    type="number" step="0.01" required
+                                                    placeholder="0.00"
+                                                    value={payment.amount}
+                                                    onChange={e => setPayments(prev => prev.map(p => p.id === payment.id ? { ...p, amount: e.target.value } : p))}
+                                                    style={{ width: '100%', padding: '12px', paddingLeft: '45px', background: 'rgba(255,255,255,0.06)', border: '1px solid var(--border)', color: 'var(--text)', borderRadius: '10px', boxSizing: 'border-box' }}
+                                                />
+                                                <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', fontSize: '13px' }}>EGP</span>
+                                            </div>
+                                            {modes.find(m => m.id === payment.modeId)?.name.match(/visa|instapay/i) && (
+                                                <button type="button" onClick={() => setActiveWebcamPaymentId(payment.id)} title={payment.receiptUrl ? "Receipt captured" : "Capture receipt photo"} style={{ background: payment.receiptUrl ? 'rgba(0,230,118,0.1)' : 'rgba(255,255,255,0.06)', border: `1px solid ${payment.receiptUrl ? 'rgba(0,230,118,0.3)' : 'var(--border)'}`, color: payment.receiptUrl ? 'var(--primary)' : 'var(--text-muted)', borderRadius: '10px', width: '42px', height: '42.5px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                                    <Camera size={18} strokeWidth={2.5} />
+                                                </button>
+                                            )}
+                                            {payments.length > 1 && (
+                                                <button type="button" onClick={() => setPayments(prev => prev.filter(p => p.id !== payment.id))} style={{ background: 'rgba(255,82,82,0.1)', border: 'none', color: 'var(--danger)', borderRadius: '10px', width: '42px', height: '42.5px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
                             ) : (
-                                <>
-                                    <CheckCircle size={14} color="var(--primary)" />
-                                    <span style={{ color: 'var(--primary)' }}>
-                                        {currentTotalPaid > finalDue
-                                            ? `Tip included: EGP ${(currentTotalPaid - finalDue).toFixed(2)}`
-                                            : 'Payment fully allocated'}
-                                    </span>
-                                </>
+                                <div style={{ padding: '20px', borderRadius: '12px', background: 'rgba(0,230,118,0.05)', border: '1px solid rgba(0,230,118,0.2)', textAlign: 'center' }}>
+                                    <div style={{ color: 'var(--primary)', fontWeight: '700', fontSize: '15px' }}>Owner Tab Charge</div>
+                                    <div style={{ color: 'var(--text-muted)', fontSize: '13px', marginTop: '4px' }}>
+                                        Total will be deducted from owner's balance. No payment modes required.
+                                    </div>
+                                </div>
                             )}
-                        </div>
 
-                        {/* Extra Tip breakdown row (Mirroring receipt style) */}
-                        {currentTotalPaid > finalDue && (
-                            <div style={{ padding: '12px 16px', borderRadius: '10px', background: 'rgba(0,230,118,0.05)', border: '1px dashed var(--primary)', display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
-                                <span style={{ color: 'var(--text-muted)' }}>Included Tip</span>
-                                <span style={{ fontWeight: '700', color: 'var(--primary)' }}>EGP {fmt(currentTotalPaid - finalDue)}</span>
+                            {/* Balance Remaining / Tip Notice */}
+                            <div style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                {currentTotalPaid < finalDue ? (
+                                    <>
+                                        <AlertCircle size={14} color="#ffab00" />
+                                        <span style={{ color: '#ffab00' }}>Remaining balance to allocate: EGP {(finalDue - currentTotalPaid).toFixed(2)}</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <CheckCircle size={14} color="var(--primary)" />
+                                        <span style={{ color: 'var(--primary)' }}>
+                                            {currentTotalPaid > finalDue
+                                                ? `Tip included: EGP ${(currentTotalPaid - finalDue).toFixed(2)}`
+                                                : 'Payment fully allocated'}
+                                        </span>
+                                    </>
+                                )}
                             </div>
-                        )}
 
-                        <div style={{ display: 'flex', gap: '12px', marginTop: '10px' }}>
-                            <Button type="submit" style={{ flex: 1 }} loading={submitting} disabled={!selectedOwnerId && currentTotalPaid < finalDue} icon={<CheckCircle size={18} />}>
-                                Confirm {selectedOwnerId ? 'Deduction' : 'Payment'}
-                            </Button>
-                            <Button type="button" variant="secondary" onClick={() => setStep('receipt')} icon={<ArrowRight size={16} style={{ transform: 'rotate(180deg)' }} />} style={{ flex: 1 }}>
-                                Back
-                            </Button>
-                        </div>
-                    </form>
+                            {/* Extra Tip breakdown row (Mirroring receipt style) */}
+                            {currentTotalPaid > finalDue && (
+                                <div style={{ padding: '12px 16px', borderRadius: '10px', background: 'rgba(0,230,118,0.05)', border: '1px dashed var(--primary)', display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
+                                    <span style={{ color: 'var(--text-muted)' }}>Included Tip</span>
+                                    <span style={{ fontWeight: '700', color: 'var(--primary)' }}>EGP {fmt(currentTotalPaid - finalDue)}</span>
+                                </div>
+                            )}
+
+                            <div style={{ display: 'flex', gap: '12px', marginTop: '10px' }}>
+                                <Button type="submit" style={{ flex: 1 }} loading={submitting} disabled={!selectedOwnerId && currentTotalPaid < finalDue} icon={<CheckCircle size={18} />}>
+                                    Confirm {selectedOwnerId ? 'Deduction' : 'Payment'}
+                                </Button>
+                                <Button type="button" variant="secondary" onClick={() => setStep('receipt')} icon={<ArrowRight size={16} style={{ transform: 'rotate(180deg)' }} />} style={{ flex: 1 }}>
+                                    Back
+                                </Button>
+                            </div>
+                        </form>
+                    )}
+
+                {activeWebcamPaymentId && (
+                    <WebcamModal
+                        onCapture={(key, url) => {
+                            setPayments(prev => prev.map(p => p.id === activeWebcamPaymentId ? { ...p, receiptKey: key, receiptUrl: url } : p));
+                            setActiveWebcamPaymentId(null);
+                        }}
+                        onClose={() => setActiveWebcamPaymentId(null)}
+                    />
                 )}
             </GlassPanel>
-
-            {activeWebcamPaymentId && (
-                <WebcamModal
-                    onCapture={(key, url) => {
-                        setPayments(prev => prev.map(p => p.id === activeWebcamPaymentId ? { ...p, receiptKey: key, receiptUrl: url } : p));
-                        setActiveWebcamPaymentId(null);
-                    }}
-                    onClose={() => setActiveWebcamPaymentId(null)}
-                />
-            )}
         </div>
     );
 };
@@ -1043,17 +1231,25 @@ interface NewOrderModalProps {
     roomId?: string;
     roomName?: string;
     sessionId?: string;
+    editingOrder?: any;
     modes?: PaymentMode[];
     onCreated: () => void;
     onClose: () => void;
 }
 
-const NewOrderModal: React.FC<NewOrderModalProps> = ({ shiftId, roomId, roomName, sessionId, modes = [], onCreated, onClose }) => {
+const NewOrderModal: React.FC<NewOrderModalProps> = ({ shiftId, roomId, roomName, sessionId, editingOrder, modes = [], onCreated, onClose }) => {
     const [orderType, setOrderType] = useState<'regular' | 'owner' | 'room'>(roomId ? 'room' : 'regular');
     const [products, setProducts] = useState<{ id: string; name: string; price: number; stockQty: number; imageUrl?: string; category?: { id: string; name: string } }[]>([]);
     const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
     const [users, setUsers] = useState<{ id: string; username: string; walletBalance: number }[]>([]);
-    const [cart, setCart] = useState<CartItem[]>([]);
+    const [cart, setCart] = useState<CartItem[]>(
+        editingOrder?.items?.map((item: any) => ({
+            productId: item.productId,
+            name: item.product?.name ?? 'Unknown',
+            price: item.unitPrice,
+            qty: item.qty
+        })) || []
+    );
     const [search, setSearch] = useState('');
     const [debouncedSearch, setDebouncedSearch] = useState('');
     const [selectedCategoryId, setSelectedCategoryId] = useState<string>('all');
@@ -1062,12 +1258,18 @@ const NewOrderModal: React.FC<NewOrderModalProps> = ({ shiftId, roomId, roomName
     const [loading, setLoading] = useState(false);
     const [loadingMore, setLoadingMore] = useState(false);
     const [submitting, setSubmitting] = useState(false);
-    const [ownerUserId, setOwnerUserId] = useState('');
+    const [ownerUserId, setOwnerUserId] = useState(editingOrder?.ownerUserId || '');
     const [promoCode, setPromoCode] = useState('');
     const [promoDiscount, setPromoDiscount] = useState<{ type: 'percent' | 'fixed'; value: number; applyTo: 'room' | 'orders' | 'both' } | null>(null);
     const [promoError, setPromoError] = useState('');
     const [loadingPromo, setLoadingPromo] = useState(false);
     const [selectedModeId, setSelectedModeId] = useState<string>(modes.find(m => m.name.toLowerCase() === 'cash')?.id ?? modes[0]?.id ?? '');
+
+    useEffect(() => {
+        if (editingOrder) {
+            setOrderType(editingOrder.type as any);
+        }
+    }, [editingOrder]);
 
     // Debounce search
     useEffect(() => {
@@ -1083,7 +1285,9 @@ const NewOrderModal: React.FC<NewOrderModalProps> = ({ shiftId, roomId, roomName
         ]).then(([cRes, uRes]) => {
             setCategories(cRes.data);
             setUsers(uRes.data);
-            if (uRes.data.length > 0) setOwnerUserId(uRes.data[0].id);
+            if (uRes.data.length > 0 && !editingOrder?.ownerUserId) {
+                setOwnerUserId(uRes.data[0].id);
+            }
         }).catch(console.error);
     }, []);
 
@@ -1138,33 +1342,49 @@ const NewOrderModal: React.FC<NewOrderModalProps> = ({ shiftId, roomId, roomName
             ? { ...c, qty: Math.max(1, c.qty + delta) } : c));
     };
 
+    const [showConfirm, setShowConfirm] = useState(false);
+
     const handleSubmit = async () => {
-        if (cart.length === 0) return toast.error('Add at least one item');
+        if (cart.length === 0) return toast.error('Order must have at least one item. To remove the order, please use the "Cancel" action in the dashboard.');
         if (orderType === 'owner' && !ownerUserId) return toast.error('Select an owner');
+        setShowConfirm(true);
+    };
+
+    const confirmSubmit = async () => {
         setSubmitting(true);
         try {
-            const res = await adminService.createOrder({
-                type: orderType,
-                shiftId,
-                roomId: orderType === 'room' ? roomId : undefined,
-                sessionId: orderType === 'room' ? sessionId : undefined,
-                items: cart.map(c => ({ productId: c.productId, qty: c.qty })),
-                promoCode: promoDiscount ? promoCode : undefined,
-                ...(orderType === 'owner' ? { ownerUserId } : {}),
-            });
-            await adminService.approveOrder(res.data.id);
-            if (orderType === 'regular' && selectedModeId) {
-                await adminService.checkoutOrder(res.data.id, {
-                    shiftId,
-                    payments: [{ modeId: selectedModeId, amount: calculateTotal() }]
+            if (editingOrder) {
+                await adminService.updateOrderItems(editingOrder.id, {
+                    items: cart.map(c => ({ productId: c.productId, qty: c.qty })),
+                    type: orderType,
+                    ownerUserId: orderType === 'owner' ? ownerUserId : undefined
                 });
+                toast.success('Order updated');
+            } else {
+                const res = await adminService.createOrder({
+                    type: orderType,
+                    shiftId,
+                    roomId: orderType === 'room' ? roomId : undefined,
+                    sessionId: orderType === 'room' ? sessionId : undefined,
+                    items: cart.map(c => ({ productId: c.productId, qty: c.qty })),
+                    promoCode: promoDiscount ? promoCode : undefined,
+                    ...(orderType === 'owner' ? { ownerUserId } : {}),
+                });
+                await adminService.approveOrder(res.data.id);
+                if (orderType === 'regular' && selectedModeId) {
+                    await adminService.checkoutOrder(res.data.id, {
+                        shiftId,
+                        payments: [{ modeId: selectedModeId, amount: calculateTotal() }]
+                    });
+                }
+                toast.success('Order created successfully');
             }
             onCreated();
-            toast.success('Order created successfully');
         } catch (err) {
-            toast.error(errMsg(err, 'Failed to create order'));
+            toast.error(errMsg(err, 'Failed to process order'));
         } finally {
             setSubmitting(false);
+            setShowConfirm(false);
         }
     };
 
@@ -1207,7 +1427,7 @@ const NewOrderModal: React.FC<NewOrderModalProps> = ({ shiftId, roomId, roomName
                 {/* Header */}
                 <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div style={{ fontWeight: '700', fontSize: '17px', display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <ShoppingCart size={18} color="var(--primary)" /> New Order {roomName && <span style={{ color: 'var(--text-muted)', fontWeight: '400' }}>— {roomName}</span>}
+                        <ShoppingCart size={18} color="var(--primary)" /> {editingOrder ? 'Edit Order' : 'New Order'} {roomName && <span style={{ color: 'var(--text-muted)', fontWeight: '400' }}>— {roomName}</span>}
                     </div>
                     <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}><X size={20} /></button>
                 </div>
@@ -1400,14 +1620,14 @@ const NewOrderModal: React.FC<NewOrderModalProps> = ({ shiftId, roomId, roomName
                                         <div key={item.productId} style={{ padding: '10px', borderRadius: '8px', background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)' }}>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
                                                 <span style={{ fontSize: '13px', fontWeight: '600' }}>{item.name}</span>
-                                                <button onClick={() => removeFromCart(item.productId)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: 0 }}>
+                                                <button type="button" onClick={() => removeFromCart(item.productId)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: 0 }}>
                                                     <Trash2 size={16} strokeWidth={2.5} />
                                                 </button>
                                             </div>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                <button onClick={() => changeQty(item.productId, -1)} style={{ width: 24, height: 24, borderRadius: '50%', background: 'rgba(255,255,255,0.1)', border: 'none', cursor: 'pointer', color: 'var(--text)', fontSize: '14px' }}>−</button>
+                                                <button type="button" onClick={() => changeQty(item.productId, -1)} style={{ width: 24, height: 24, borderRadius: '50%', background: 'rgba(255,255,255,0.1)', border: 'none', cursor: 'pointer', color: 'var(--text)', fontSize: '14px' }}>−</button>
                                                 <span style={{ fontSize: '13px', fontWeight: '700', minWidth: 20, textAlign: 'center' }}>{item.qty}</span>
-                                                <button onClick={() => changeQty(item.productId, 1)} style={{ width: 24, height: 24, borderRadius: '50%', background: 'rgba(255,255,255,0.1)', border: 'none', cursor: 'pointer', color: 'var(--text)', fontSize: '14px' }}>+</button>
+                                                <button type="button" onClick={() => changeQty(item.productId, 1)} style={{ width: 24, height: 24, borderRadius: '50%', background: 'rgba(255,255,255,0.1)', border: 'none', cursor: 'pointer', color: 'var(--text)', fontSize: '14px' }}>+</button>
                                                 <span style={{ marginLeft: 'auto', fontSize: '13px', color: 'var(--text-muted)' }}>EGP {fmt(item.price * item.qty)}</span>
                                             </div>
                                         </div>
@@ -1461,13 +1681,21 @@ const NewOrderModal: React.FC<NewOrderModalProps> = ({ shiftId, roomId, roomName
                                     Wallet deduction happens on approval — order stays pending until staff approves
                                 </div>
                             )}
-                            <Button style={{ width: '100%' }} loading={submitting} icon={<Plus size={16} />} onClick={() => void handleSubmit()}>
-                                {orderType === 'owner' ? 'Create Owner Order' : orderType === 'room' ? 'Add Order to Room' : 'Place Walk-in Order'}
+                            <Button style={{ width: '100%' }} loading={submitting} icon={editingOrder ? <CheckCircle size={16} /> : <Plus size={16} />} onClick={() => void handleSubmit()}>
+                                {editingOrder ? 'Update Order' : (orderType === 'owner' ? 'Create Owner Order' : orderType === 'room' ? 'Add Order to Room' : 'Place Walk-in Order')}
                             </Button>
                         </div>
                     </div>
                 </div>
             </GlassPanel>
+
+            <ConfirmModal
+                isOpen={showConfirm}
+                onClose={() => setShowConfirm(false)}
+                onConfirm={() => void confirmSubmit()}
+                title="Confirm Order"
+                message={`Are you sure you want to place this ${orderType === 'room' ? 'room' : orderType === 'owner' ? 'owner' : 'walk-in'} order for EGP ${fmt(cartTotal)}?`}
+            />
         </div>
     );
 };
@@ -1478,6 +1706,7 @@ interface OrdersPanelProps {
     orders: OrderSummary[];
     onApprove: (id: string) => void;
     onCancel: (id: string) => void;
+    onEdit: (order: OrderSummary) => void;
     onNewOrder: () => void;
     shiftOpen: boolean;
     // Server-side pagination
@@ -1515,19 +1744,27 @@ const OrderStatusBadge: React.FC<{ status: string }> = ({ status }) => {
 };
 
 const OrdersPanel: React.FC<OrdersPanelProps> = ({
-    orders, onApprove, onCancel, onNewOrder, shiftOpen,
+    orders, onApprove, onCancel, onEdit, onNewOrder, shiftOpen,
     page, totalPages, total, pageSize, statusFilter,
     onPageChange, onStatusFilterChange,
 }) => {
     const [actioning, setActioning] = useState<string | null>(null);
+    const [confirmAction, setConfirmAction] = useState<{ id: string; type: 'approve' | 'cancel' } | null>(null);
 
-    const handleAction = async (id: string, action: 'approve' | 'cancel') => {
+    const handleAction = (id: string, action: 'approve' | 'cancel') => {
+        setConfirmAction({ id, type: action });
+    };
+
+    const executeAction = async () => {
+        if (!confirmAction) return;
+        const { id, type } = confirmAction;
         setActioning(id);
         try {
-            if (action === 'approve') await onApprove(id);
+            if (type === 'approve') await onApprove(id);
             else await onCancel(id);
         } finally {
             setActioning(null);
+            setConfirmAction(null);
         }
     };
 
@@ -1608,15 +1845,25 @@ const OrdersPanel: React.FC<OrdersPanelProps> = ({
                                     ))}
                                 </div>
 
-                                {order.status === 'pending' && (
+                                {(order.status === 'pending' || order.status === 'approved') && (
                                     <div style={{ display: 'flex', gap: '8px' }}>
+                                        {order.status === 'pending' && (
+                                            <button
+                                                disabled={actioning === order.id}
+                                                onClick={() => void handleAction(order.id, 'approve')}
+                                                style={{ flex: 1, padding: '7px', borderRadius: '8px', background: 'rgba(0,230,118,0.12)', border: '1px solid var(--primary)', color: 'var(--primary)', cursor: 'pointer', fontWeight: '700', fontSize: '12px' }}
+                                            >
+                                                <CheckCircle size={16} strokeWidth={2.5} style={{ verticalAlign: 'middle', marginRight: 4 }} />
+                                                Approve
+                                            </button>
+                                        )}
                                         <button
                                             disabled={actioning === order.id}
-                                            onClick={() => void handleAction(order.id, 'approve')}
-                                            style={{ flex: 1, padding: '7px', borderRadius: '8px', background: 'rgba(0,230,118,0.12)', border: '1px solid var(--primary)', color: 'var(--primary)', cursor: 'pointer', fontWeight: '700', fontSize: '12px' }}
+                                            onClick={() => onEdit(order)}
+                                            style={{ flex: 1, padding: '7px', borderRadius: '8px', background: 'rgba(41,121,255,0.08)', border: '1px solid #2979ff', color: '#2979ff', cursor: 'pointer', fontWeight: '700', fontSize: '12px' }}
                                         >
-                                            <CheckCircle size={16} strokeWidth={2.5} style={{ verticalAlign: 'middle', marginRight: 4 }} />
-                                            Approve
+                                            <Edit3 size={16} strokeWidth={2.5} style={{ verticalAlign: 'middle', marginRight: 4 }} />
+                                            Edit
                                         </button>
                                         <button
                                             disabled={actioning === order.id}
@@ -1676,6 +1923,15 @@ const OrdersPanel: React.FC<OrdersPanelProps> = ({
                     )}
                 </>
             )}
+
+            <ConfirmModal
+                isOpen={!!confirmAction}
+                onClose={() => setConfirmAction(null)}
+                onConfirm={() => void executeAction()}
+                type={confirmAction?.type === 'cancel' ? 'danger' : 'primary'}
+                title={confirmAction?.type === 'approve' ? 'Approve Order' : 'Cancel Order'}
+                message={`Are you sure you want to ${confirmAction?.type} order #${confirmAction?.id.slice(0, 8)}?`}
+            />
         </GlassPanel>
     );
 };
@@ -1700,6 +1956,8 @@ const StaffDashboard: React.FC<StaffDashboardProps> = ({ rooms, fetchRooms, curr
     const [orderRoom, setOrderRoom] = useState<RoomWithSession | null>(null);
     const [isPrintingShiftReport, setIsPrintingShiftReport] = useState(false);
     const [showDetailedReport, setShowDetailedReport] = useState(false);
+    const [roomToOpen, setRoomToOpen] = useState<RoomWithSession | null>(null);
+    const [orderToEdit, setOrderToEdit] = useState<any>(null);
 
     const augmentedShiftForReport: Shift | null = currentShift ? {
         ...currentShift,
@@ -1800,7 +2058,11 @@ const StaffDashboard: React.FC<StaffDashboardProps> = ({ rooms, fetchRooms, curr
 
     useSocket(BASE_URL, (type, data) => {
         if (type === 'order_update' || type === 'order_notification' || type === 'order.created' || type === 'order.approved' || type === 'order.updated' || type === 'order.cancelled') {
-            toast('🔔 New order activity received!', { icon: '📦', position: 'bottom-right', id: 'order-toast' });
+            const isNewPending = type === 'order.created' || type === 'order_notification' || (data && (data as any).status === 'pending');
+            if (isNewPending) {
+                playNotificationSound();
+            }
+            toast(`🔔 New order activity received!${isNewPending ? ' (Pending Action)' : ''}`, { icon: '📦', position: 'bottom-right', id: 'order-toast' });
             void fetchOrders();
             void fetchRoomStates();
         } else if (type === 'room_update') {
@@ -1939,13 +2201,23 @@ const StaffDashboard: React.FC<StaffDashboardProps> = ({ rooms, fetchRooms, curr
             return;
         }
 
+        if (room.status === 'available') {
+            setRoomToOpen(room);
+            return;
+        }
+    };
+
+    const confirmOpenRoom = async () => {
+        if (!roomToOpen) return;
         try {
             // Reaching here means starting a session — shift is guaranteed by the check above
-            await roomService.startSession(room.id, currentShift!.id);
+            await roomService.startSession(roomToOpen.id, currentShift!.id);
             fetchRooms();
-            toast.success(`Session started in ${room.name}`);
+            toast.success(`Session started in ${roomToOpen.name}`);
         } catch (err: unknown) {
             toast.error(errMsg(err, 'Error starting session'));
+        } finally {
+            setRoomToOpen(null);
         }
     };
 
@@ -2255,6 +2527,11 @@ const StaffDashboard: React.FC<StaffDashboardProps> = ({ rooms, fetchRooms, curr
                         orders={orders}
                         onApprove={id => void handleApproveOrder(id)}
                         onCancel={id => void handleCancelOrder(id)}
+                        onEdit={(order) => {
+                            setOrderToEdit(order);
+                            setOrderRoom({ id: order.roomId, name: order.room?.name } as any);
+                            setShowNewOrderModal(true);
+                        }}
                         onNewOrder={() => setShowNewOrderModal(true)}
                         shiftOpen={!!currentShift}
                         page={ordersPage}
@@ -2285,6 +2562,12 @@ const StaffDashboard: React.FC<StaffDashboardProps> = ({ rooms, fetchRooms, curr
                         modes={paymentModes}
                         onConfirm={handleReceiptConfirm}
                         onClose={() => setReceiptRoom(null)}
+                        onEditOrder={(order) => {
+                            setReceiptRoom(null);
+                            setOrderToEdit(order);
+                            setOrderRoom(receiptRoom);
+                            setShowNewOrderModal(true);
+                        }}
                         onAddOrder={() => {
                             setReceiptRoom(null);
                             setOrderRoom(receiptRoom);
@@ -2292,6 +2575,7 @@ const StaffDashboard: React.FC<StaffDashboardProps> = ({ rooms, fetchRooms, curr
                         }}
                         isAdminViewing={!currentShift && (userRole === 'ADMIN' || userRole === 'admin')}
                         staffName={username}
+                        userRole={userRole}
                     />
                 )
             }
@@ -2304,16 +2588,19 @@ const StaffDashboard: React.FC<StaffDashboardProps> = ({ rooms, fetchRooms, curr
                         roomId={orderRoom?.id}
                         roomName={orderRoom?.name}
                         sessionId={orderRoom?.activeSession?.id}
+                        editingOrder={orderToEdit}
                         modes={paymentModes}
                         onCreated={() => {
                             setShowNewOrderModal(false);
                             setOrderRoom(null);
+                            setOrderToEdit(null);
                             void fetchOrders();
                             void fetchRoomStates();
                         }}
                         onClose={() => {
                             setShowNewOrderModal(false);
                             setOrderRoom(null);
+                            setOrderToEdit(null);
                         }}
                     />
                 )
@@ -2323,6 +2610,14 @@ const StaffDashboard: React.FC<StaffDashboardProps> = ({ rooms, fetchRooms, curr
                 isOpen={showRevenueCalc}
                 stats={shiftStats}
                 onClose={() => setShowRevenueCalc(false)}
+            />
+
+            <ConfirmModal
+                isOpen={!!roomToOpen}
+                onClose={() => setRoomToOpen(null)}
+                onConfirm={() => void confirmOpenRoom()}
+                title="Open Room"
+                message={`Are you sure you want to start a session in ${roomToOpen?.name}?`}
             />
         </div>
     );

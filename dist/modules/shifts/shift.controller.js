@@ -104,6 +104,7 @@ const getShiftStats = async (req, res) => {
             prisma_service_1.prisma.expense.findMany({ where: { shiftId: id } }),
             prisma_service_1.prisma.session.findMany({
                 where: { closedShiftId: id, status: 'closed' },
+                orderBy: { endTime: 'desc' },
                 include: {
                     room: { select: { name: true } },
                     sessionCharge: true
@@ -227,6 +228,7 @@ const getShiftHistory = async (req, res) => {
                     stats: true,
                     expenses: true,
                     openedSessions: {
+                        orderBy: { endTime: 'desc' },
                         include: {
                             room: { select: { id: true, name: true } },
                             orders: {
@@ -242,6 +244,7 @@ const getShiftHistory = async (req, res) => {
                     },
                     orders: {
                         where: { sessionId: null },
+                        orderBy: { createdAt: 'desc' },
                         include: {
                             items: {
                                 include: { product: { select: { id: true, name: true, price: true } } },
@@ -335,6 +338,7 @@ const getAllShifts = async (req, res) => {
                     stats: true,
                     expenses: true,
                     openedSessions: {
+                        orderBy: { endTime: 'desc' },
                         include: {
                             room: { select: { id: true, name: true } },
                             sessionCharge: true,

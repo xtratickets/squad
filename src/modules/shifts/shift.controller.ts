@@ -110,6 +110,7 @@ export const getShiftStats = async (req: Request, res: Response) => {
             prisma.expense.findMany({ where: { shiftId: id } }),
             prisma.session.findMany({
                 where: { closedShiftId: id, status: 'closed' },
+                orderBy: { endTime: 'desc' },
                 include: {
                     room: { select: { name: true } },
                     sessionCharge: true
@@ -247,6 +248,7 @@ export const getShiftHistory = async (req: any, res: Response) => {
                     stats: true,
                     expenses: true,
                     openedSessions: {
+                        orderBy: { endTime: 'desc' },
                         include: {
                             room: { select: { id: true, name: true } },
                             orders: {
@@ -262,6 +264,7 @@ export const getShiftHistory = async (req: any, res: Response) => {
                     },
                     orders: {
                         where: { sessionId: null }, // standalone orders not linked to a session
+                        orderBy: { createdAt: 'desc' },
                         include: {
                             items: {
                                 include: { product: { select: { id: true, name: true, price: true } } },
@@ -373,6 +376,7 @@ export const getAllShifts = async (req: Request, res: Response) => {
                     stats: true,
                     expenses: true,
                     openedSessions: {
+                        orderBy: { endTime: 'desc' },
                         include: {
                             room: { select: { id: true, name: true } },
                             sessionCharge: true,

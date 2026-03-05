@@ -153,6 +153,11 @@ export const adminService = {
     approveOrder: (id: string) => api.post<OrderSummary>(`/orders/${id}/approve`, {}),
     checkoutOrder: (id: string, data: { payments: { modeId: string; amount: number }[]; shiftId: string }) => api.post(`/orders/${id}/checkout`, data),
     cancelOrder: (id: string) => api.patch<OrderSummary>(`/orders/${id}`, { status: 'cancelled' }),
+    updateOrderItems: (id: string, data: { items: { productId: string; qty: number }[]; type?: string; ownerUserId?: string }) => api.patch<OrderSummary>(`/orders/${id}/items`, data),
+
+    // Sessions (Admin/Operation)
+    cancelSession: (id: string) => api.post(`/sessions/${id}/cancel`, {}),
+    updateSessionDiscount: (id: string, discount: number) => api.post(`/sessions/${id}/discount`, { discount }),
 
     // Staff-accessible users list (for owner selector in orders)
     getUsersList: () => api.get<{ id: string; username: string; walletBalance: number }[]>('/users/list'),
