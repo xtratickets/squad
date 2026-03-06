@@ -94,7 +94,7 @@ const TransactionHistory: React.FC = () => {
         {
             header: 'Amount',
             key: 'amount',
-            render: (p: Payment) => <span style={{ fontWeight: 'bold', color: 'var(--primary)' }}>EGP {p.amount.toFixed(2)}</span>,
+            render: (p: Payment) => <span style={{ fontWeight: 'bold', color: 'var(--primary)' }}>EGP {Math.round(p.amount)}</span>,
         },
         {
             header: 'Staff',

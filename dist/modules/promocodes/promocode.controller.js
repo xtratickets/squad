@@ -79,7 +79,7 @@ const updatePromoCode = async (req, res) => {
             data: {
                 ...(code !== undefined ? { code } : {}),
                 ...(type !== undefined ? { type } : {}),
-                ...(value !== undefined ? { value: parseFloat(value) } : {}),
+                ...(value !== undefined ? { value: Math.round(parseFloat(value)) } : {}),
                 ...(expiry !== undefined ? { expiry: expiry ? new Date(expiry) : null } : {}),
                 ...(usageLimit !== undefined ? { usageLimit: parseInt(usageLimit) } : {}),
                 ...(applyTo !== undefined ? { applyTo } : {}),

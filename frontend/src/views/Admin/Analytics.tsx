@@ -135,7 +135,7 @@ const Analytics: React.FC = () => {
                                         </span>
                                     </div>
                                     <div style={{ fontSize: '22px', fontWeight: '700', color }}>
-                                        EGP {(mode._sum.amount ?? 0).toFixed(2)}
+                                        EGP {Math.round(mode._sum.amount ?? 0)}
                                     </div>
                                 </div>
                             );

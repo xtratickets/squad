@@ -10,7 +10,7 @@ const recordSalary = async (req, res) => {
             const s = await tx.salary.create({
                 data: {
                     staffId,
-                    amount,
+                    amount: Math.round(amount),
                     period,
                     shiftId,
                 },

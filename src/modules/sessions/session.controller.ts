@@ -440,20 +440,28 @@ export const cancelSession = async (req: any, res: Response) => {
                         } as any,
                     });
 
-                    // Revert Wallet Payment record
-                    const walletMode = await tx.paymentMode.findFirst({
-                        where: { name: { equals: 'Wallet', mode: 'insensitive' } }
-                    });
-                    const payment = await tx.payment.findFirst({
-                        where: { referenceType: 'session', referenceId: id, modeId: walletMode?.id || 'none' }
-                    });
-                    if (payment) {
-                        await tx.payment.delete({ where: { id: payment.id } });
+                }
+
+                // 2. Revert ALL Payments for this session and update ShiftStats
+                const payments = await tx.payment.findMany({
+                    where: { referenceType: 'session', referenceId: id },
+                    include: { mode: true }
+                });
+
+                for (const p of payments) {
+                    const modeName = p.mode.name.toUpperCase();
+                    const updateData: any = {};
+                    if (modeName === 'CASH') updateData.paymentsCash = { decrement: p.amount };
+                    else if (modeName === 'WALLET') updateData.paymentsWallet = { decrement: p.amount };
+                    else updateData.paymentsCard = { decrement: p.amount };
+
+                    if (Object.keys(updateData).length > 0) {
                         await tx.shiftStats.update({
                             where: { shiftId },
-                            data: { paymentsWallet: { decrement: payment.amount } }
+                            data: updateData,
                         });
                     }
+                    await tx.payment.delete({ where: { id: p.id } });
                 }
 
                 await tx.sessionCharge.delete({ where: { sessionId: id } });

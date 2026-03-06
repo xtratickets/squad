@@ -11,6 +11,7 @@ export const roomService = {
         api.post(`/sessions/${sessionId}/end`, { closedShiftId, promoCode, tip }),
     pauseSession: (sessionId: string) => api.post(`/sessions/${sessionId}/pause`),
     resumeSession: (sessionId: string) => api.post(`/sessions/${sessionId}/resume`),
+    cancelSession: (sessionId: string) => api.post(`/sessions/${sessionId}/cancel`),
 
     // Shifts
     getActiveShift: () => api.get<Shift>('/shifts/active'),

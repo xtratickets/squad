@@ -2,7 +2,7 @@ import { prisma } from './prisma.service';
 
 export class BillingService {
     static round(val: number): number {
-        return Math.round(val * 100) / 100;
+        return Math.round(val);
     }
 
     static async computeSessionCharge(sessionId: string, endTime: Date, discountAmount: number = 0, tip: number = 0) {

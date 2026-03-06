@@ -109,7 +109,7 @@ const ShiftManagement: React.FC = () => {
             header: 'Opening Cash',
             key: 'openingCash',
             render: (s: Shift) => s.stats?.openingCash !== undefined
-                ? <span style={{ fontWeight: '600' }}>EGP {s.stats.openingCash.toFixed(2)}</span>
+                ? <span style={{ fontWeight: '600' }}>EGP {Math.round(s.stats.openingCash)}</span>
                 : <span style={{ color: 'var(--text-muted)' }}>-</span>
         },
         {
@@ -117,7 +117,7 @@ const ShiftManagement: React.FC = () => {
             key: 'cash',
             render: (s: Shift) => {
                 const cashAmount = s.paymentsByMode ? s.paymentsByMode.find(m => m.name.toLowerCase() === 'cash')?.amount ?? 0 : s.stats?.paymentsCash ?? 0;
-                return <span style={{ color: 'var(--primary)', fontWeight: '600' }}>EGP {cashAmount.toFixed(2)}</span>;
+                return <span style={{ color: 'var(--primary)', fontWeight: '600' }}>EGP {Math.round(cashAmount)}</span>;
             }
         },
         {
@@ -135,9 +135,9 @@ const ShiftManagement: React.FC = () => {
             key: 'total_revenue',
             render: (s: Shift) => {
                 const total = s.paymentsByMode
-                    ? s.paymentsByMode.reduce((sum, p) => sum + p.amount, 0)
-                    : (s.stats?.paymentsCash ?? 0) + (s.stats?.paymentsCard ?? 0) + (s.stats?.paymentsWallet ?? 0);
-                return <span style={{ fontWeight: '700' }}>EGP {total.toFixed(2)}</span>;
+                    ? s.paymentsByMode.filter(m => m.name.toUpperCase() !== 'WALLET').reduce((sum, p) => sum + p.amount, 0)
+                    : (s.stats?.paymentsCash ?? 0) + (s.stats?.paymentsCard ?? 0);
+                return <span style={{ fontWeight: '700' }}>EGP {Math.round(total)}</span>;
             }
         },
     ];

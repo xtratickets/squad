@@ -4,6 +4,7 @@ exports.getAllShifts = exports.getShiftHistory = exports.getShifts = exports.get
 const prisma_service_1 = require("../../services/prisma.service");
 const logger_1 = require("../../utils/logger");
 const storage_service_1 = require("../../services/storage.service");
+const round2 = (val) => Math.round(val);
 const openShift = async (req, res) => {
     const staffId = req.user.userId;
     const { openingCash } = req.body;
@@ -113,9 +114,9 @@ const getShiftStats = async (req, res) => {
             prisma_service_1.prisma.sessionCharge.findMany({ where: { shiftId: id } }),
             prisma_service_1.prisma.orderCharge.findMany({ where: { shiftId: id } })
         ]);
-        const totalServiceFees = sessionCharges.reduce((s, c) => s + c.serviceFee, 0) + orderCharges.reduce((s, c) => s + c.serviceFee, 0);
-        const totalTax = sessionCharges.reduce((s, c) => s + c.tax, 0) + orderCharges.reduce((s, c) => s + c.tax, 0);
-        const totalDiscounts = sessionCharges.reduce((s, c) => s + c.discount, 0) + orderCharges.reduce((s, c) => s + c.discount, 0);
+        const totalServiceFees = round2(sessionCharges.reduce((s, c) => s + c.serviceFee, 0) + orderCharges.reduce((s, c) => s + c.serviceFee, 0));
+        const totalTax = round2(sessionCharges.reduce((s, c) => s + c.tax, 0) + orderCharges.reduce((s, c) => s + c.tax, 0));
+        const totalDiscounts = round2(sessionCharges.reduce((s, c) => s + c.discount, 0) + orderCharges.reduce((s, c) => s + c.discount, 0));
         const groupedPayments = payments.reduce((acc, p) => {
             const modeName = p.mode?.name || 'Unknown';
             acc[modeName] = (acc[modeName] || 0) + p.amount;
@@ -139,10 +140,10 @@ const getShiftStats = async (req, res) => {
                 endTime: s.endTime,
                 totalPausedMinutes: s.totalPausedMinutes || 0,
                 totalPausedMs: s.totalPausedMs || 0,
-                finalTotal: s.sessionCharge?.finalTotal || 0,
-                roomAmount: s.sessionCharge?.roomAmount || 0,
-                ordersAmount: s.sessionCharge?.ordersAmount || 0,
-                discount: s.sessionCharge?.discount || 0,
+                finalTotal: round2(s.sessionCharge?.finalTotal || 0),
+                roomAmount: round2(s.sessionCharge?.roomAmount || 0),
+                ordersAmount: round2(s.sessionCharge?.ordersAmount || 0),
+                discount: round2(s.sessionCharge?.discount || 0),
             }))
         });
     }
@@ -293,12 +294,12 @@ const getShiftHistory = async (req, res) => {
             }));
             const sessionsWithCharges = shift.openedSessions;
             const standaloneOrders = shift.orders;
-            const totalServiceFees = sessionsWithCharges.reduce((sum, s) => sum + (s.sessionCharge?.serviceFee || 0), 0) +
-                standaloneOrders.reduce((sum, o) => sum + (o.orderCharge?.serviceFee || 0), 0);
-            const totalTax = sessionsWithCharges.reduce((sum, s) => sum + (s.sessionCharge?.tax || 0), 0) +
-                standaloneOrders.reduce((sum, o) => sum + (o.orderCharge?.tax || 0), 0);
-            const totalDiscounts = sessionsWithCharges.reduce((sum, s) => sum + (s.sessionCharge?.discount || 0), 0) +
-                standaloneOrders.reduce((sum, o) => sum + (o.orderCharge?.discount || 0), 0);
+            const totalServiceFees = round2(sessionsWithCharges.reduce((sum, s) => sum + (s.sessionCharge?.serviceFee || 0), 0) +
+                standaloneOrders.reduce((sum, o) => sum + (o.orderCharge?.serviceFee || 0), 0));
+            const totalTax = round2(sessionsWithCharges.reduce((sum, s) => sum + (s.sessionCharge?.tax || 0), 0) +
+                standaloneOrders.reduce((sum, o) => sum + (o.orderCharge?.tax || 0), 0));
+            const totalDiscounts = round2(sessionsWithCharges.reduce((sum, s) => sum + (s.sessionCharge?.discount || 0), 0) +
+                standaloneOrders.reduce((sum, o) => sum + (o.orderCharge?.discount || 0), 0));
             return {
                 ...shift,
                 stats: shift.stats ? {

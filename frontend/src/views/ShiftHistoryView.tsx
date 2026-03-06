@@ -52,7 +52,7 @@ const PaymentsEditor: React.FC<PaymentsEditorProps> = ({ payments, onUpdated }) 
         }
     };
 
-    const formatCurrency = (v?: number) => `EGP ${(v || 0).toFixed(2)}`;
+    const formatCurrency = (v?: number) => `EGP ${Math.round(v || 0)}`;
 
     return (
         <div style={{ marginBottom: '24px', background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '8px' }}>
@@ -195,7 +195,7 @@ const ShiftHistoryView: React.FC<ShiftHistoryViewProps> = ({ user }) => {
         setExpandedShifts(prev => ({ ...prev, [id]: !prev[id] }));
     };
 
-    const formatCurrency = (val?: number) => `EGP ${(val || 0).toFixed(2)}`;
+    const formatCurrency = (val?: number) => `EGP ${Math.round(val || 0)}`;
 
     const formatDuration = (start: string, end?: string) => {
         if (!end) return 'Active Now';
@@ -287,7 +287,7 @@ const ShiftHistoryView: React.FC<ShiftHistoryViewProps> = ({ user }) => {
                                                         <div style={{ fontSize: '20px', fontWeight: '800', color: shift.status === 'open' ? 'var(--primary)' : 'var(--text)' }}>
                                                             {formatCurrency(
                                                                 ((shift.paymentsByMode?.reduce((sum, p) => sum + p.amount, 0) ?? 0) ||
-                                                                    ((shift.stats?.paymentsCash || 0) + (shift.stats?.paymentsCard || 0) + (shift.stats?.paymentsWallet || 0))) -
+                                                                    ((shift.stats?.paymentsCash || 0) + (shift.stats?.paymentsCard || 0))) -
                                                                 (shift.stats?.tipsTotal ?? 0)
                                                             )}
                                                         </div>
@@ -371,10 +371,10 @@ const ShiftHistoryView: React.FC<ShiftHistoryViewProps> = ({ user }) => {
                                 <div style={{ flex: 1 }}>
                                     <div>{printingSession.room.name}</div>
                                     <div style={{ fontSize: '10px', opacity: 0.8 }}>
-                                        {printingSession.sessionCharge?.billableMinutes} mins @ EGP {printingSession.sessionCharge?.hourlyPrice.toFixed(2)}/hr
+                                        {printingSession.sessionCharge?.billableMinutes} mins @ EGP {Math.round(printingSession.sessionCharge?.hourlyPrice || 0)}/hr
                                     </div>
                                 </div>
-                                <div className="mono">EGP {printingSession.sessionCharge?.roomAmount.toFixed(2)}</div>
+                                <div className="mono">EGP {Math.round(printingSession.sessionCharge?.roomAmount || 0)}</div>
                             </div>
                             <div className="receipt-divider" />
                         </>
@@ -389,9 +389,9 @@ const ShiftHistoryView: React.FC<ShiftHistoryViewProps> = ({ user }) => {
                                         <div key={item.id} className="receipt-row" style={{ fontSize: '12px' }}>
                                             <div style={{ flex: 1 }}>
                                                 <div>{item.product?.name || 'Item'}</div>
-                                                <div style={{ fontSize: '10px', opacity: 0.8 }}>{item.qty} x EGP {item.unitPrice.toFixed(2)}</div>
+                                                <div style={{ fontSize: '10px', opacity: 0.8 }}>{item.qty} x EGP {Math.round(item.unitPrice)}</div>
                                             </div>
-                                            <div className="mono">EGP {item.total.toFixed(2)}</div>
+                                            <div className="mono">EGP {Math.round(item.total)}</div>
                                         </div>
                                     ))}
                                 </div>
@@ -405,30 +405,30 @@ const ShiftHistoryView: React.FC<ShiftHistoryViewProps> = ({ user }) => {
                             <>
                                 <div className="receipt-row" style={{ fontSize: '14px', fontWeight: 'bold' }}>
                                     <span>SUBTOTAL</span>
-                                    <span className="mono">EGP {(printingSession.sessionCharge.roomAmount + printingSession.sessionCharge.ordersAmount).toFixed(2)}</span>
+                                    <span className="mono">EGP {Math.round(printingSession.sessionCharge.roomAmount + printingSession.sessionCharge.ordersAmount)}</span>
                                 </div>
                                 {printingSession.sessionCharge.discount > 0 && (
-                                    <div className="receipt-row" style={{ fontSize: '12px' }}>
-                                        <span>DISCOUNT</span>
-                                        <span className="mono">-EGP {printingSession.sessionCharge.discount.toFixed(2)}</span>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                                        <div>Discount</div>
+                                        <span className="mono">-EGP {Math.round(printingSession.sessionCharge.discount)}</span>
                                     </div>
                                 )}
                                 {printingSession.sessionCharge.serviceFee > 0 && (
-                                    <div className="receipt-row" style={{ fontSize: '12px' }}>
-                                        <span>SERVICE FEE</span>
-                                        <span className="mono">+EGP {printingSession.sessionCharge.serviceFee.toFixed(2)}</span>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                                        <div>Service Fee</div>
+                                        <span className="mono">+EGP {Math.round(printingSession.sessionCharge.serviceFee)}</span>
                                     </div>
                                 )}
                                 {printingSession.sessionCharge.tax > 0 && (
-                                    <div className="receipt-row" style={{ fontSize: '12px' }}>
-                                        <span>TAX</span>
-                                        <span className="mono">+EGP {printingSession.sessionCharge.tax.toFixed(2)}</span>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                                        <div>Taxes</div>
+                                        <span className="mono">+EGP {Math.round(printingSession.sessionCharge.tax)}</span>
                                     </div>
                                 )}
                                 {printingSession.sessionCharge.tip > 0 && (
-                                    <div className="receipt-row" style={{ fontSize: '12px' }}>
-                                        <span>TIP</span>
-                                        <span className="mono">+EGP {printingSession.sessionCharge.tip.toFixed(2)}</span>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                                        <div>Tip</div>
+                                        <span className="mono">+EGP {Math.round(printingSession.sessionCharge.tip)}</span>
                                     </div>
                                 )}
                             </>
@@ -437,7 +437,7 @@ const ShiftHistoryView: React.FC<ShiftHistoryViewProps> = ({ user }) => {
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderTop: '2px solid #000', borderBottom: '2px solid #000', margin: '10px 0' }}>
                             <span style={{ fontSize: '16px', fontWeight: '900' }}>TOTAL PAID</span>
                             <span style={{ fontSize: '20px', fontWeight: '900' }} className="mono">
-                                EGP {(printingSession?.sessionCharge?.finalTotal || printingOrder?.orderCharge?.finalTotal || 0).toFixed(2)}
+                                EGP {Math.round(printingSession?.sessionCharge?.finalTotal || printingOrder?.orderCharge?.finalTotal || 0)}
                             </span>
                         </div>
                     </div>

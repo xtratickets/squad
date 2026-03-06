@@ -322,7 +322,29 @@ export const updateOrder = async (req: any, res: Response) => {
                         },
                     });
 
-                    // 3. If owner order, credit wallet back
+                    // 3. Revert ALL Payments for this order and update ShiftStats
+                    const payments = await tx.payment.findMany({
+                        where: { referenceType: 'order', referenceId: id },
+                        include: { mode: true }
+                    });
+
+                    for (const p of payments) {
+                        const modeName = p.mode.name.toUpperCase();
+                        const updateData: any = {};
+                        if (modeName === 'CASH') updateData.paymentsCash = { decrement: p.amount };
+                        else if (modeName === 'WALLET') updateData.paymentsWallet = { decrement: p.amount };
+                        else updateData.paymentsCard = { decrement: p.amount };
+
+                        if (Object.keys(updateData).length > 0) {
+                            await tx.shiftStats.update({
+                                where: { shiftId: order.shiftId },
+                                data: updateData,
+                            });
+                        }
+                        await tx.payment.delete({ where: { id: p.id } });
+                    }
+
+                    // 4. If owner order, credit wallet back
                     const ownerUserId = (order as any).ownerUserId as string | null;
                     if (order.type === 'owner' && ownerUserId) {
                         await (tx as any).user.update({
@@ -338,18 +360,6 @@ export const updateOrder = async (req: any, res: Response) => {
                                 shiftId: order.shiftId,
                             },
                         });
-
-                        // Also revert the Payment record for the owner
-                        const payment = await tx.payment.findFirst({
-                            where: { referenceType: 'order', referenceId: id, modeId: 'WALLET' }
-                        });
-                        if (payment) {
-                            await tx.payment.delete({ where: { id: payment.id } });
-                            await tx.shiftStats.update({
-                                where: { shiftId: order.shiftId },
-                                data: { paymentsWallet: { decrement: payment.amount } }
-                            });
-                        }
                     }
                 }
             }
@@ -424,16 +434,26 @@ export const updateOrderItems = async (req: any, res: Response) => {
                         }
                     });
 
-                    // Revert Payment & ShiftStats Card/Cash/Wallet (though for owner it's always wallet)
-                    const payment = await tx.payment.findFirst({
-                        where: { referenceType: 'order', referenceId: id, modeId: 'WALLET' }
+                    // Revert ALL Payments for this order and update ShiftStats
+                    const payments = await tx.payment.findMany({
+                        where: { referenceType: 'order', referenceId: id },
+                        include: { mode: true }
                     });
-                    if (payment) {
-                        await tx.payment.delete({ where: { id: payment.id } });
-                        await tx.shiftStats.update({
-                            where: { shiftId: order.shiftId },
-                            data: { paymentsWallet: { decrement: payment.amount } }
-                        });
+
+                    for (const p of payments) {
+                        const modeName = p.mode.name.toUpperCase();
+                        const updateData: any = {};
+                        if (modeName === 'CASH') updateData.paymentsCash = { decrement: p.amount };
+                        else if (modeName === 'WALLET') updateData.paymentsWallet = { decrement: p.amount };
+                        else updateData.paymentsCard = { decrement: p.amount };
+
+                        if (Object.keys(updateData).length > 0) {
+                            await tx.shiftStats.update({
+                                where: { shiftId: order.shiftId },
+                                data: updateData,
+                            });
+                        }
+                        await tx.payment.delete({ where: { id: p.id } });
                     }
                 }
 

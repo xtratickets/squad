@@ -133,7 +133,7 @@ const SessionsTab: React.FC = () => {
                         ? <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>No payments for this session.</span>
                         : localPayments.map((p: any) => (
                             <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', padding: '10px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px' }}>
-                                <span style={{ fontSize: '13px', fontWeight: 600 }}>EGP {(p.amount ?? 0).toFixed(2)}</span>
+                                <span style={{ fontSize: '13px', fontWeight: 600 }}>EGP {Math.round(p.amount ?? 0)}</span>
                                 <select
                                     value={p.modeId ?? ''}
                                     disabled={savingPayment}
@@ -173,10 +173,10 @@ const SessionsTab: React.FC = () => {
                             key: 'total',
                             render: (s: any) => s.sessionCharge ? (
                                 <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                    <span style={{ fontWeight: 600 }}>EGP {s.sessionCharge.finalTotal?.toFixed(2)}</span>
+                                    <span style={{ fontWeight: 600 }}>EGP {Math.round(s.sessionCharge.finalTotal || 0)}</span>
                                     {s.sessionCharge.discount > 0 && (
                                         <span style={{ fontSize: '10px', color: '#f87171', fontWeight: 700 }}>
-                                            -EGP {s.sessionCharge.discount?.toFixed(2)} (Disc)
+                                            -EGP {Math.round(s.sessionCharge.discount || 0)} (Disc)
                                         </span>
                                     )}
                                 </div>
@@ -192,6 +192,19 @@ const SessionsTab: React.FC = () => {
                             <Button size="small" variant="secondary" onClick={() => openPayments(s)}>
                                 <CreditCard size={13} /> Payments
                             </Button>
+                            {s.status !== 'cancelled' && (
+                                <Button size="small" variant="danger" onClick={async () => {
+                                    if (window.confirm(`Are you sure you want to CANCEL session in ${s.room?.name}? This will reverse ALL revenue and payments associated with this session.`)) {
+                                        try {
+                                            await api.post(`/sessions/${s.id}/cancel`);
+                                            toast.success('Session cancelled and reversed');
+                                            void load();
+                                        } catch { toast.error('Failed to cancel session'); }
+                                    }
+                                }}>
+                                    <X size={13} /> Cancel
+                                </Button>
+                            )}
                         </div>
                     )}
                 />
@@ -284,7 +297,7 @@ const OrdersTab: React.FC = () => {
                         {editCart.map((item, idx) => (
                             <div key={idx} style={{ display: 'flex', gap: '10px', alignItems: 'center', background: 'rgba(255,255,255,0.03)', padding: '8px 12px', borderRadius: '8px' }}>
                                 <span style={{ flex: 1, fontSize: '13px', fontWeight: 600 }}>{item.name}</span>
-                                <span style={{ fontSize: '13px', color: 'var(--primary)', fontWeight: 600 }}>EGP {item.price.toFixed(2)}</span>
+                                <span style={{ fontSize: '13px', color: 'var(--primary)', fontWeight: 600 }}>EGP {Math.round(item.price)}</span>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(0,0,0,0.3)', padding: '2px', borderRadius: '6px' }}>
                                     <button onClick={() => {
                                         const newCart = [...editCart];
@@ -327,7 +340,7 @@ const OrdersTab: React.FC = () => {
                             >
                                 <option value="" style={{ background: '#1a1a1a' }}>-- Select product to add --</option>
                                 {products.map((p: any) => (
-                                    <option key={p.id} value={p.id} style={{ background: '#1a1a1a' }}>{p.name} (EGP {p.price.toFixed(2)})</option>
+                                    <option key={p.id} value={p.id} style={{ background: '#1a1a1a' }}>{p.name} (EGP {Math.round(p.price)})</option>
                                 ))}
                             </select>
                         </div>
@@ -361,7 +374,7 @@ const OrdersTab: React.FC = () => {
                         { header: 'Status', key: 'status', render: (o: any) => <span style={{ color: statusColor(o.status), fontWeight: 600 }}>{o.status}</span> },
                         { header: 'Room', key: 'room', render: (o: any) => <span>{o.room?.name ?? '—'}</span> },
                         { header: 'Items', key: 'items', render: (o: any) => <span style={{ color: 'var(--text-muted)' }}>{o.items?.length ?? 0} item(s)</span> },
-                        { header: 'Total', key: 'total', render: (o: any) => o.orderCharge ? <span style={{ fontWeight: 700 }}>EGP {o.orderCharge.finalTotal.toFixed(2)}</span> : <span style={{ color: 'var(--text-muted)' }}>—</span> },
+                        { header: 'Total', key: 'total', render: (o: any) => o.orderCharge ? <span style={{ fontWeight: 700 }}>EGP {Math.round(o.orderCharge.finalTotal)}</span> : <span style={{ color: 'var(--text-muted)' }}>—</span> },
                         { header: 'Date', key: 'createdAt', render: (o: any) => <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{new Date(o.createdAt).toLocaleString()}</span> },
                     ]}
                     actions={(o: any) => (
@@ -458,7 +471,7 @@ const PaymentsTab: React.FC = () => {
                     columns={[
                         { header: 'ID', key: 'id', render: (p: any) => <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{p.id.slice(0, 8)}</span> },
                         { header: 'Mode', key: 'mode', render: (p: any) => <span style={{ fontWeight: 600, color: 'var(--primary)' }}>{p.mode?.name ?? '—'}</span> },
-                        { header: 'Amount', key: 'amount', render: (p: any) => <span style={{ fontWeight: 700 }}>EGP {p.amount.toFixed(2)}</span> },
+                        { header: 'Amount', key: 'amount', render: (p: any) => <span style={{ fontWeight: 700 }}>EGP {Math.round(p.amount)}</span> },
                         { header: 'Ref Type', key: 'referenceType', render: (p: any) => <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>{p.referenceType}</span> },
                         { header: 'Staff', key: 'staff', render: (p: any) => <span style={{ fontSize: '12px' }}>{p.shift?.staff?.username ?? '—'}</span> },
                         { header: 'Date', key: 'createdAt', render: (p: any) => <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{new Date(p.createdAt).toLocaleString()}</span> },
@@ -549,10 +562,10 @@ const ShiftsTab: React.FC = () => {
             </table>
             <hr/>
             <table>
-                <tr><td>Opening Cash</td><td>EGP ${(stats?.openingCash ?? 0).toFixed(2)}</td></tr>
-                <tr><td>Cash Payments</td><td>EGP ${(stats?.paymentsCash ?? 0).toFixed(2)}</td></tr>
-                <tr><td>Card Payments</td><td>EGP ${(stats?.paymentsCard ?? 0).toFixed(2)}</td></tr>
-                <tr><td>Total Revenue</td><td>EGP ${(stats?.totalRevenue ?? 0).toFixed(2)}</td></tr>
+                <tr><td>Opening Cash</td><td>EGP ${Math.round(stats?.openingCash ?? 0)}</td></tr>
+                <tr><td>Cash Payments</td><td>EGP ${Math.round(stats?.paymentsCash ?? 0)}</td></tr>
+                <tr><td>Card Payments</td><td>EGP ${Math.round(stats?.paymentsCard ?? 0)}</td></tr>
+                <tr><td>Total Revenue</td><td>EGP ${Math.round(stats?.totalRevenue ?? 0)}</td></tr>
                 <tr><td>Sessions</td><td>${shift.openedSessions?.length ?? 0}</td></tr>
             </table>
             <hr/>
@@ -574,7 +587,7 @@ const ShiftsTab: React.FC = () => {
                         { header: 'Status', key: 'status', render: (s: any) => <span style={{ color: s.status === 'open' ? 'var(--primary)' : 'var(--text-muted)', fontWeight: 600 }}>{s.status}</span> },
                         { header: 'Start', key: 'startTime', render: (s: any) => <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{new Date(s.startTime).toLocaleString()}</span> },
                         { header: 'End', key: 'endTime', render: (s: any) => s.endTime ? <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{new Date(s.endTime).toLocaleString()}</span> : <span style={{ color: 'var(--primary)', fontSize: '12px' }}>Open</span> },
-                        { header: 'Revenue', key: 'revenue', render: (s: any) => <span style={{ fontWeight: 700 }}>EGP {(s.stats?.totalRevenue ?? 0).toFixed(2)}</span> },
+                        { header: 'Revenue', key: 'revenue', render: (s: any) => <span style={{ fontWeight: 700 }}>EGP {Math.round(s.stats?.totalRevenue ?? 0)}</span> },
                         { header: 'Sessions', key: 'sessions', render: (s: any) => <span style={{ color: 'var(--text-muted)' }}>{s.openedSessions?.length ?? 0}</span> },
                     ]}
                     actions={(s: any) => (

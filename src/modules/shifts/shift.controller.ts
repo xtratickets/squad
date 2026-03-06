@@ -3,7 +3,7 @@ import { prisma } from '../../services/prisma.service';
 import { logger } from '../../utils/logger';
 import { StorageService } from '../../services/storage.service';
 
-const round2 = (val: number) => Math.round(val * 100) / 100;
+const round2 = (val: number) => Math.round(val);
 
 export const openShift = async (req: any, res: Response) => {
     const staffId = req.user.userId;

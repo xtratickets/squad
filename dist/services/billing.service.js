@@ -4,7 +4,7 @@ exports.BillingService = void 0;
 const prisma_service_1 = require("./prisma.service");
 class BillingService {
     static round(val) {
-        return Math.round(val * 100) / 100;
+        return Math.round(val);
     }
     static async computeSessionCharge(sessionId, endTime, discountAmount = 0, tip = 0) {
         const session = await prisma_service_1.prisma.session.findUnique({

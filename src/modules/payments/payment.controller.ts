@@ -152,7 +152,7 @@ export const editPayment = async (req: any, res: Response) => {
         const updated = await prisma.payment.update({
             where: { id },
             data: {
-                ...(amount !== undefined && ['OPERATION', 'ADMIN'].includes(userRole) ? { amount: parseFloat(amount) } : {}),
+                ...(amount !== undefined && ['OPERATION', 'ADMIN'].includes(userRole) ? { amount: Math.round(parseFloat(amount)) } : {}),
                 ...(modeId ? { modeId } : {}),
             },
             include: { mode: true },

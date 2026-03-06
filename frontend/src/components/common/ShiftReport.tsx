@@ -7,15 +7,17 @@ interface ShiftReportProps {
     mode?: 'display' | 'print';
     onViewSession?: (session: SessionDetail) => void;
     onViewOrder?: (order: SessionOrder) => void;
+    onCancelSession?: (id: string, roomName: string) => void;
 }
 
 const ShiftReport: React.FC<ShiftReportProps> = ({
     shift,
     mode = 'display',
     onViewSession,
-    onViewOrder
+    onViewOrder,
+    onCancelSession
 }) => {
-    const formatCurrency = (val?: number) => `EGP ${(val || 0).toFixed(2)}`;
+    const formatCurrency = (val?: number) => `EGP ${Math.round(val || 0)}`;
 
     const formatDuration = (start: string, end?: string) => {
         if (!end) return 'Active Now';
@@ -28,7 +30,9 @@ const ShiftReport: React.FC<ShiftReportProps> = ({
 
     if (mode === 'print') {
         const totalExpenses = shift.stats?.expenses?.reduce((sum: number, e: any) => sum + e.amount, 0) || 0;
-        const totalPayments = (shift.paymentsByMode || []).reduce((sum, m) => sum + m.amount, 0) ||
+        const totalPayments = (shift.paymentsByMode || [])
+            .filter(m => m.name.toUpperCase() !== 'WALLET')
+            .reduce((sum, m) => sum + m.amount, 0) ||
             (shift.stats?.paymentsCash || 0) + (shift.stats?.paymentsCard || 0);
 
         return (
@@ -178,9 +182,9 @@ const ShiftReport: React.FC<ShiftReportProps> = ({
                             </div>
                         ))}
                         <div>
-                            <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '4px' }}>Total Payments</div>
+                            <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '4px' }}>Total Collected (Cash+Card)</div>
                             <div style={{ fontSize: '14px', fontWeight: 'bold', color: 'var(--text)' }}>
-                                {formatCurrency(shift.paymentsByMode.reduce((sum, p) => sum + p.amount, 0))}
+                                {formatCurrency(shift.paymentsByMode.filter(m => m.name.toUpperCase() !== 'WALLET').reduce((sum, p) => sum + p.amount, 0))}
                             </div>
                         </div>
                     </>
@@ -259,7 +263,7 @@ const ShiftReport: React.FC<ShiftReportProps> = ({
                                             )}
                                         </div>
                                     </div>
-                                    <div style={{ textAlign: 'right' }}>
+                                    <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
                                         {(s.sessionCharge as any)?.discount > 0 && (
                                             <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px' }}>
                                                 After Disc: {formatCurrency(((s.sessionCharge as any).itemsTotal || (s.sessionCharge as any).roomAmount + (s.sessionCharge as any).ordersAmount) - (s.sessionCharge as any).discount)}
@@ -268,6 +272,14 @@ const ShiftReport: React.FC<ShiftReportProps> = ({
                                         <div style={{ fontSize: '13px', fontWeight: 'bold', color: 'var(--primary)' }}>
                                             {formatCurrency(s.sessionCharge?.finalTotal)}
                                         </div>
+                                        {onCancelSession && s.status !== 'cancelled' && (
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); onCancelSession(s.id, s.room.name); }}
+                                                style={{ marginTop: '6px', background: 'rgba(255,82,82,0.1)', border: '1px solid var(--danger)', color: 'var(--danger)', fontSize: '10px', fontWeight: 'bold', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer' }}
+                                            >
+                                                Cancel
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
                             ))

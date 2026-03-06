@@ -10,7 +10,7 @@ export const createExpense = async (req: any, res: Response) => {
         const expense = await prisma.$transaction(async (tx) => {
             const e = await tx.expense.create({
                 data: {
-                    amount,
+                    amount: Math.round(amount),
                     category,
                     shiftId,
                     createdById,

@@ -83,8 +83,8 @@ const createProduct = async (req, res) => {
             data: {
                 name,
                 categoryId,
-                price: parseFloat(price),
-                cost: parseFloat(cost),
+                price: Math.round(parseFloat(price)),
+                cost: Math.round(parseFloat(cost)),
                 stockQty: parseInt(stockQty || '0'),
                 imageUrl,
             },
@@ -145,8 +145,8 @@ const updateProduct = async (req, res) => {
         const updateData = {
             name,
             categoryId,
-            price: price ? parseFloat(price) : undefined,
-            cost: cost ? parseFloat(cost) : undefined,
+            price: price ? Math.round(parseFloat(price)) : undefined,
+            cost: cost ? Math.round(parseFloat(cost)) : undefined,
             stockQty: stockQty !== undefined ? parseInt(stockQty) : undefined,
             imageUrl,
         };

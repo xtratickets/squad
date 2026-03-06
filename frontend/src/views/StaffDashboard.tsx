@@ -103,7 +103,7 @@ function getGreeting() {
     return 'Evening';
 }
 
-const fmt = (n: number) => n.toFixed(2);
+const fmt = (n: number) => Math.round(n).toString();
 
 const playNotificationSound = () => {
     try {
@@ -233,8 +233,10 @@ const RevenueCalculationModal: React.FC<{
 }> = ({ isOpen, stats, onClose }) => {
     if (!stats) return null;
 
-    const totalPayments = (stats.paymentsByMode || []).reduce((sum, m) => sum + m.amount, 0) ||
-        (stats.paymentsCash || 0) + (stats.paymentsCard || 0) + (stats.paymentsWallet || 0);
+    const totalPayments = (stats.paymentsByMode || [])
+        .filter(m => m.name.toUpperCase() !== 'WALLET')
+        .reduce((sum, m) => sum + m.amount, 0) ||
+        (stats.paymentsCash || 0) + (stats.paymentsCard || 0);
 
     return (
         <Modal isOpen={isOpen} title="Revenue Calculation Breakdown" onClose={onClose}>
@@ -246,28 +248,28 @@ const RevenueCalculationModal: React.FC<{
                             stats.paymentsByMode.map(m => (
                                 <div key={m.name} style={{ display: 'flex', justifyContent: 'space-between' }}>
                                     <span style={{ color: 'var(--text-muted)' }}>{m.name}</span>
-                                    <span style={{ fontWeight: '600', fontFamily: 'monospace' }}>EGP {m.amount.toFixed(2)}</span>
+                                    <span style={{ fontWeight: '600', fontFamily: 'monospace' }}>EGP {fmt(m.amount)}</span>
                                 </div>
                             ))
                         ) : (
                             <>
                                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                                     <span style={{ color: 'var(--text-muted)' }}>Cash</span>
-                                    <span style={{ fontWeight: '600', fontFamily: 'monospace' }}>EGP {stats.paymentsCash?.toFixed(2) || '0.00'}</span>
+                                    <span style={{ fontWeight: '600', fontFamily: 'monospace' }}>EGP {fmt(stats.paymentsCash || 0)}</span>
                                 </div>
                                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                                     <span style={{ color: 'var(--text-muted)' }}>Card</span>
-                                    <span style={{ fontWeight: '600', fontFamily: 'monospace' }}>EGP {stats.paymentsCard?.toFixed(2) || '0.00'}</span>
+                                    <span style={{ fontWeight: '600', fontFamily: 'monospace' }}>EGP {fmt(stats.paymentsCard || 0)}</span>
                                 </div>
                                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                                     <span style={{ color: 'var(--text-muted)' }}>Wallet</span>
-                                    <span style={{ fontWeight: '600', fontFamily: 'monospace' }}>EGP {stats.paymentsWallet?.toFixed(2) || '0.00'}</span>
+                                    <span style={{ fontWeight: '600', fontFamily: 'monospace' }}>EGP {fmt(stats.paymentsWallet || 0)}</span>
                                 </div>
                             </>
                         )}
                         <div style={{ borderTop: '1px solid var(--border)', paddingTop: '10px', marginTop: '6px', display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '15px' }}>
                             <span>Total Collections</span>
-                            <span style={{ color: 'var(--primary)' }}>EGP {totalPayments.toFixed(2)}</span>
+                            <span style={{ color: 'var(--primary)' }}>EGP {fmt(totalPayments)}</span>
                         </div>
                     </div>
                 </section>
@@ -277,39 +279,39 @@ const RevenueCalculationModal: React.FC<{
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', background: 'rgba(255,255,255,0.03)', padding: '16px', borderRadius: '12px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                             <span style={{ color: 'var(--text-muted)' }}>Room Sessions (Time)</span>
-                            <span style={{ fontWeight: '600', fontFamily: 'monospace' }}>EGP {stats.sessionsRevenue?.toFixed(2) || '0.00'}</span>
+                            <span style={{ fontWeight: '600', fontFamily: 'monospace' }}>EGP {fmt(stats.sessionsRevenue || 0)}</span>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                             <span style={{ color: 'var(--text-muted)' }}>Orders (Product Sales)</span>
-                            <span style={{ fontWeight: '600', fontFamily: 'monospace' }}>EGP {stats.ordersRevenue?.toFixed(2) || '0.00'}</span>
+                            <span style={{ fontWeight: '600', fontFamily: 'monospace' }}>EGP {fmt(stats.ordersRevenue || 0)}</span>
                         </div>
                         {(stats.totalServiceFees || 0) > 0 && (
                             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                                 <span style={{ color: 'var(--text-muted)' }}>Service Fees</span>
-                                <span style={{ fontWeight: '600', fontFamily: 'monospace' }}>EGP {stats.totalServiceFees?.toFixed(2)}</span>
+                                <span style={{ fontWeight: '600', fontFamily: 'monospace' }}>EGP {fmt(stats.totalServiceFees || 0)}</span>
                             </div>
                         )}
                         {(stats.totalTax || 0) > 0 && (
                             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                                 <span style={{ color: 'var(--text-muted)' }}>Taxes</span>
-                                <span style={{ fontWeight: '600', fontFamily: 'monospace' }}>EGP {stats.totalTax?.toFixed(2)}</span>
+                                <span style={{ fontWeight: '600', fontFamily: 'monospace' }}>EGP {fmt(stats.totalTax || 0)}</span>
                             </div>
                         )}
                         {(stats.totalDiscounts || 0) > 0 && (
                             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                                 <span style={{ color: 'var(--text-muted)' }}>Discounts Applied</span>
-                                <span style={{ fontWeight: '600', color: '#f87171', fontFamily: 'monospace' }}>-EGP {stats.totalDiscounts?.toFixed(2)}</span>
+                                <span style={{ fontWeight: '600', color: '#f87171', fontFamily: 'monospace' }}>-EGP {fmt(stats.totalDiscounts || 0)}</span>
                             </div>
                         )}
                         {stats?.tipsTotal && stats.tipsTotal > 0 && (
                             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                                 <span style={{ color: 'var(--text-muted)' }}>Tips Received</span>
-                                <span style={{ fontWeight: '600', fontFamily: 'monospace' }}>EGP {stats.tipsTotal.toFixed(2)}</span>
+                                <span style={{ fontWeight: '600', fontFamily: 'monospace' }}>EGP {fmt(stats.tipsTotal)}</span>
                             </div>
                         )}
                         <div style={{ borderTop: '1px solid var(--border)', paddingTop: '10px', marginTop: '6px', display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '15px' }}>
                             <span>Total Sales (Revenue)</span>
-                            <span style={{ color: 'var(--primary)' }}>EGP {(stats.totalRevenue || 0).toFixed(2)}</span>
+                            <span style={{ color: 'var(--primary)' }}>EGP {fmt(stats.totalRevenue || 0)}</span>
                         </div>
                     </div>
                 </section>
@@ -630,7 +632,7 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ sessionId, roomName, shiftI
             }
         }
         const final = billing.finalTotal - discountAmt + explicitTip;
-        setPayments([{ id: Date.now().toString(), modeId: modes[0]?.id ?? '', amount: Math.max(0, final).toFixed(2) }]);
+        setPayments([{ id: Date.now().toString(), modeId: modes[0]?.id ?? '', amount: Math.round(Math.max(0, final)).toString() }]);
     };
 
     const validatePromo = async () => {
@@ -1097,7 +1099,7 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ sessionId, roomName, shiftI
                                         ))}
                                     </select>
                                 </div>
-                                <div style={{ width: '140px' }}>
+                                <div style={{ width: '140px', display: 'none' }}>
                                     <label style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px', display: 'block', textTransform: 'uppercase', letterSpacing: '1px' }}>Explicit Tip</label>
                                     <div style={{ position: 'relative' }}>
                                         <input
@@ -1108,6 +1110,8 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ sessionId, roomName, shiftI
                                                 setTipInput(e.target.value);
                                                 recalculateAmount(data.billing, promoDiscount, parseFloat(e.target.value || '0'));
                                             }}
+                                            disabled={true}
+
                                             style={{ width: '100%', padding: '12px', paddingLeft: '45px', background: 'rgba(255,171,0,0.05)', border: '1px solid rgba(255,171,0,0.3)', color: '#ffab00', borderRadius: '10px', boxSizing: 'border-box' }}
                                         />
                                         <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#ffab00', fontSize: '13px' }}>EGP</span>
@@ -1123,7 +1127,7 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ sessionId, roomName, shiftI
                                         <button type="button" onClick={() => {
                                             const computedDue = computeFinalDue() + parseFloat(tipInput || '0');
                                             const remaining = Math.max(0, computedDue - currentTotalPaid);
-                                            setPayments([...payments, { id: Date.now().toString(), modeId: modes[0]?.id ?? '', amount: remaining > 0 ? remaining.toFixed(2) : '' }]);
+                                            setPayments([...payments, { id: Date.now().toString(), modeId: modes[0]?.id ?? '', amount: remaining > 0 ? Math.round(remaining).toString() : '' }]);
                                         }} style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
                                             <Plus size={14} /> Add Mode
                                         </button>
@@ -1177,14 +1181,14 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ sessionId, roomName, shiftI
                                 {currentTotalPaid < finalDue ? (
                                     <>
                                         <AlertCircle size={14} color="#ffab00" />
-                                        <span style={{ color: '#ffab00' }}>Remaining balance to allocate: EGP {(finalDue - currentTotalPaid).toFixed(2)}</span>
+                                        <span style={{ color: '#ffab00' }}>Remaining balance to allocate: EGP {fmt(finalDue - currentTotalPaid)}</span>
                                     </>
                                 ) : (
                                     <>
                                         <CheckCircle size={14} color="var(--primary)" />
                                         <span style={{ color: 'var(--primary)' }}>
                                             {currentTotalPaid > finalDue
-                                                ? `Tip included: EGP ${(currentTotalPaid - finalDue).toFixed(2)}`
+                                                ? `Tip included: EGP ${fmt(currentTotalPaid - finalDue)}`
                                                 : 'Payment fully allocated'}
                                         </span>
                                     </>
@@ -2093,7 +2097,7 @@ const StaffDashboard: React.FC<StaffDashboardProps> = ({ rooms, fetchRooms, curr
         }
     }, [currentShift]);
 
-    const [activeTab, setActiveTab] = useState<'overview' | 'orders'>('overview');
+    const [activeTab, setActiveTab] = useState<'overview' | 'orders' | 'sessions'>('overview');
     const [pendingOrdersCount, setPendingOrdersCount] = useState<number>(0);
 
     // Fetch orders for the shift (server-side paginated)
@@ -2147,6 +2151,18 @@ const StaffDashboard: React.FC<StaffDashboardProps> = ({ rooms, fetchRooms, curr
             toast.success('Order cancelled');
         }
         catch (err) { toast.error((err as { response?: { data?: { error?: string } } }).response?.data?.error ?? 'Failed to cancel'); }
+    };
+
+    const handleCancelSessionCompletely = async (id: string) => {
+        try {
+            await roomService.cancelSession(id);
+            toast.success('Session cancelled and revenue reversed');
+            void fetchStats();
+            void fetchRooms();
+            void fetchRoomStates();
+        } catch (err) {
+            toast.error(errMsg(err, 'Failed to cancel session'));
+        }
     };
 
     useEffect(() => {
@@ -2335,7 +2351,7 @@ const StaffDashboard: React.FC<StaffDashboardProps> = ({ rooms, fetchRooms, curr
                     <StatCard
                         icon="EGP"
                         label="Total Payments without Tips"
-                        value={`EGP ${fmt(((shiftStats?.paymentsByMode?.reduce((s, m) => s + m.amount, 0) ?? 0) || (shiftStats?.paymentsCash ?? 0) + (shiftStats?.paymentsCard ?? 0) + (shiftStats?.paymentsWallet ?? 0)) - (shiftStats?.tipsTotal ?? 0))}`}
+                        value={`EGP ${fmt(((shiftStats?.paymentsByMode?.filter(m => m.name.toUpperCase() !== 'WALLET').reduce((s, m) => s + m.amount, 0) ?? 0) || (shiftStats?.paymentsCash ?? 0) + (shiftStats?.paymentsCard ?? 0)) - (shiftStats?.tipsTotal ?? 0))}`}
                         color="var(--primary)"
                         highlight
                     />
@@ -2396,6 +2412,20 @@ const StaffDashboard: React.FC<StaffDashboardProps> = ({ rooms, fetchRooms, curr
                             </span>
                         )}
                     </button>
+                    {(userRole === 'OPERATION' || userRole === 'ADMIN' || userRole === 'admin' || userRole === 'OPERATION') && (
+                        <button
+                            onClick={() => setActiveTab('sessions')}
+                            style={{
+                                padding: '8px 20px', borderRadius: '8px', fontSize: '14px', fontWeight: '700',
+                                background: activeTab === 'sessions' ? 'var(--primary)' : 'transparent',
+                                color: activeTab === 'sessions' ? '#000' : 'var(--text-muted)',
+                                border: 'none', cursor: 'pointer', transition: 'all 0.2s',
+                                display: 'flex', alignItems: 'center', gap: '8px'
+                            }}
+                        >
+                            <HistoryIcon size={16} /> Sessions
+                        </button>
+                    )}
                 </div>
 
                 {/* ── Tab Views ────────────────────────────────────────── */}
@@ -2542,6 +2572,28 @@ const StaffDashboard: React.FC<StaffDashboardProps> = ({ rooms, fetchRooms, curr
                         onPageChange={(p) => { setOrdersPage(p); void fetchOrders(p, ordersStatusFilter); }}
                         onStatusFilterChange={(s) => { setOrdersStatusFilter(s); setOrdersPage(0); void fetchOrders(0, s); }}
                     />
+                )}
+
+                {activeTab === 'sessions' && (
+                    <GlassPanel style={{ padding: '24px' }}>
+                        <h2 style={{ fontSize: '18px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
+                            <HistoryIcon size={20} color="var(--primary)" /> Session Management
+                        </h2>
+                        {augmentedShiftForReport ? (
+                            <ShiftReport
+                                shift={augmentedShiftForReport}
+                                onCancelSession={(id, name) => {
+                                    if (window.confirm(`Are you sure you want to CANCEL session in ${name}? This will reverse all revenue and payments.`)) {
+                                        void handleCancelSessionCompletely(id);
+                                    }
+                                }}
+                            />
+                        ) : (
+                            <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
+                                No active shift data available.
+                            </div>
+                        )}
+                    </GlassPanel>
                 )}
             </div>
 

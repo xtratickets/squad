@@ -286,6 +286,27 @@ const updateOrder = async (req, res) => {
                             tipsTotal: { decrement: charge.tip },
                         },
                     });
+                    const payments = await tx.payment.findMany({
+                        where: { referenceType: 'order', referenceId: id },
+                        include: { mode: true }
+                    });
+                    for (const p of payments) {
+                        const modeName = p.mode.name.toUpperCase();
+                        const updateData = {};
+                        if (modeName === 'CASH')
+                            updateData.paymentsCash = { decrement: p.amount };
+                        else if (modeName === 'WALLET')
+                            updateData.paymentsWallet = { decrement: p.amount };
+                        else
+                            updateData.paymentsCard = { decrement: p.amount };
+                        if (Object.keys(updateData).length > 0) {
+                            await tx.shiftStats.update({
+                                where: { shiftId: order.shiftId },
+                                data: updateData,
+                            });
+                        }
+                        await tx.payment.delete({ where: { id: p.id } });
+                    }
                     const ownerUserId = order.ownerUserId;
                     if (order.type === 'owner' && ownerUserId) {
                         await tx.user.update({
@@ -301,16 +322,6 @@ const updateOrder = async (req, res) => {
                                 shiftId: order.shiftId,
                             },
                         });
-                        const payment = await tx.payment.findFirst({
-                            where: { referenceType: 'order', referenceId: id, modeId: 'WALLET' }
-                        });
-                        if (payment) {
-                            await tx.payment.delete({ where: { id: payment.id } });
-                            await tx.shiftStats.update({
-                                where: { shiftId: order.shiftId },
-                                data: { paymentsWallet: { decrement: payment.amount } }
-                            });
-                        }
                     }
                 }
             }
@@ -376,15 +387,26 @@ const updateOrderItems = async (req, res) => {
                             shiftId: order.shiftId
                         }
                     });
-                    const payment = await tx.payment.findFirst({
-                        where: { referenceType: 'order', referenceId: id, modeId: 'WALLET' }
+                    const payments = await tx.payment.findMany({
+                        where: { referenceType: 'order', referenceId: id },
+                        include: { mode: true }
                     });
-                    if (payment) {
-                        await tx.payment.delete({ where: { id: payment.id } });
-                        await tx.shiftStats.update({
-                            where: { shiftId: order.shiftId },
-                            data: { paymentsWallet: { decrement: payment.amount } }
-                        });
+                    for (const p of payments) {
+                        const modeName = p.mode.name.toUpperCase();
+                        const updateData = {};
+                        if (modeName === 'CASH')
+                            updateData.paymentsCash = { decrement: p.amount };
+                        else if (modeName === 'WALLET')
+                            updateData.paymentsWallet = { decrement: p.amount };
+                        else
+                            updateData.paymentsCard = { decrement: p.amount };
+                        if (Object.keys(updateData).length > 0) {
+                            await tx.shiftStats.update({
+                                where: { shiftId: order.shiftId },
+                                data: updateData,
+                            });
+                        }
+                        await tx.payment.delete({ where: { id: p.id } });
                     }
                 }
                 if (order.orderCharge) {

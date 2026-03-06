@@ -37,13 +37,13 @@ const topUpWallet = async (req, res) => {
         const result = await prisma_service_1.prisma.$transaction(async (tx) => {
             const user = await tx.user.update({
                 where: { id: userId },
-                data: { walletBalance: { increment: amount } },
+                data: { walletBalance: { increment: Math.round(amount) } },
                 select: { id: true, username: true, walletBalance: true },
             });
             const txn = await tx.walletTransaction.create({
                 data: {
                     userId,
-                    amount,
+                    amount: Math.round(amount),
                     note: note ?? `Top-up by ${req.user?.userId}`,
                     shiftId,
                 },
