@@ -14,6 +14,8 @@ interface DataTableProps<T> {
     searchKey?: keyof T | string;
     searchPlaceholder?: string;
     actions?: (item: T) => React.ReactNode;
+    onSearch?: (term: string) => void;
+    loading?: boolean;
 }
 
 function DataTable<T extends { id: string | number }>({
@@ -21,28 +23,48 @@ function DataTable<T extends { id: string | number }>({
     columns,
     searchKey,
     searchPlaceholder = "Search...",
-    actions
+    actions,
+    onSearch,
+    loading
 }: DataTableProps<T>) {
     const [searchTerm, setSearchTerm] = useState('');
 
-    const filteredData = searchTerm && searchKey
-        ? data.filter(item => {
+    const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const value = e.target.value;
+        setSearchTerm(value);
+        if (onSearch) {
+            onSearch(value);
+        }
+    };
+
+    const filteredData = onSearch || (!searchTerm || !searchKey)
+        ? data
+        : data.filter(item => {
             const value = (item as Record<string, unknown>)[searchKey as string];
             return String(value).toLowerCase().includes(searchTerm.toLowerCase());
-        })
-        : data;
+        });
 
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', position: 'relative' }}>
             {searchKey && (
                 <div style={{ position: 'relative', width: '100%', maxWidth: '300px' }}>
                     <Search size={18} style={{ position: 'absolute', left: '15px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
                     <input
                         placeholder={searchPlaceholder}
                         value={searchTerm}
-                        onChange={e => setSearchTerm(e.target.value)}
+                        onChange={handleSearchChange}
                         style={{ paddingLeft: '45px', width: '100%', boxSizing: 'border-box' }}
                     />
+                </div>
+            )}
+
+            {loading && (
+                <div style={{
+                    position: 'absolute', inset: 0, top: '58px', background: 'rgba(0,0,0,0.1)',
+                    backdropFilter: 'blur(1px)', zIndex: 10, display: 'flex', alignItems: 'center',
+                    justifyContent: 'center', borderRadius: '12px'
+                }}>
+                    <div style={{ color: 'var(--primary)', fontSize: '13px', fontWeight: '600' }}>Loading...</div>
                 </div>
             )}
 

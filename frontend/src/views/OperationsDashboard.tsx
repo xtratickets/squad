@@ -240,6 +240,11 @@ const OrdersTab: React.FC = () => {
     const [newStatus, setNewStatus] = useState('');
     const [editCart, setEditCart] = useState<any[]>([]);
     const [products, setProducts] = useState<any[]>([]);
+    const [categories, setCategories] = useState<any[]>([]);
+    const [search, setSearch] = useState('');
+    const [debouncedSearch, setDebouncedSearch] = useState('');
+    const [selectedCategoryId, setSelectedCategoryId] = useState<string>('all');
+    const [loadingProducts, setLoadingProducts] = useState(false);
 
     const load = async () => {
         setLoading(true);
@@ -253,12 +258,34 @@ const OrdersTab: React.FC = () => {
     };
 
     useEffect(() => { void load(); }, [page]);
+
+    // Initial categories load
     useEffect(() => {
-        api.get('/products?page=1&pageSize=500').then(r => {
+        api.get('/products/categories').then(r => setCategories(r.data)).catch(() => { });
+    }, []);
+
+    // Debounce search
+    useEffect(() => {
+        const timer = setTimeout(() => setDebouncedSearch(search), 500);
+        return () => clearTimeout(timer);
+    }, [search]);
+
+    // Load products with search/category
+    useEffect(() => {
+        if (!editing || editType !== 'items') return;
+        setLoadingProducts(true);
+        const params = new URLSearchParams();
+        params.append('page', '1');
+        params.append('pageSize', '50');
+        if (debouncedSearch) params.append('search', debouncedSearch);
+        if (selectedCategoryId !== 'all') params.append('categoryId', selectedCategoryId);
+
+        api.get(`/products?${params.toString()}`).then(r => {
             const payload = r.data;
             setProducts(payload.data ?? payload);
-        }).catch(() => { });
-    }, []);
+        }).catch(() => { })
+            .finally(() => setLoadingProducts(false));
+    }, [debouncedSearch, selectedCategoryId, editing, editType]);
 
     const saveStatus = async () => {
         if (!editing) return;
@@ -316,33 +343,77 @@ const OrdersTab: React.FC = () => {
                         {editCart.length === 0 && <span style={{ color: 'var(--text-muted)', fontSize: '13px', textAlign: 'center', padding: '10px' }}>Cart is empty</span>}
                     </div>
 
-                    <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-end', paddingTop: '10px', borderTop: '1px solid var(--border)' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', paddingTop: '10px', borderTop: '1px solid var(--border)' }}>
                         <div style={{ flex: 1 }}>
-                            <label style={{ display: 'block', fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '1px' }}>Add Product</label>
-                            <select
-                                defaultValue=""
-                                onChange={e => {
-                                    const pid = e.target.value;
-                                    if (!pid) return;
-                                    const prod = products.find(p => p.id === pid);
-                                    if (!prod) return;
-                                    const existing = editCart.findIndex(i => i.productId === pid);
-                                    if (existing >= 0) {
-                                        const newCart = [...editCart];
-                                        newCart[existing].qty++;
-                                        setEditCart(newCart);
-                                    } else {
-                                        setEditCart([...editCart, { productId: prod.id, name: prod.name, price: prod.price, qty: 1 }]);
-                                    }
-                                    e.target.value = '';
-                                }}
-                                style={{ width: '100%', padding: '10px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', color: 'var(--text)', borderRadius: '8px' }}
-                            >
-                                <option value="" style={{ background: '#1a1a1a' }}>-- Select product to add --</option>
-                                {products.map((p: any) => (
-                                    <option key={p.id} value={p.id} style={{ background: '#1a1a1a' }}>{p.name} (EGP {Math.round(p.price)})</option>
-                                ))}
-                            </select>
+                            <label style={{ display: 'block', fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '1px' }}>Search & Add Product</label>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                <input
+                                    placeholder="Search products..."
+                                    value={search}
+                                    onChange={e => setSearch(e.target.value)}
+                                    style={{ width: '100%', padding: '10px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', color: 'var(--text)', borderRadius: '8px' }}
+                                />
+                                <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '4px' }} className="scrollable-x">
+                                    <button
+                                        onClick={() => setSelectedCategoryId('all')}
+                                        style={{
+                                            padding: '4px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '700', whiteSpace: 'nowrap',
+                                            background: selectedCategoryId === 'all' ? 'var(--primary)' : 'rgba(255,255,255,0.06)',
+                                            color: selectedCategoryId === 'all' ? '#000' : 'var(--text)',
+                                            border: '1px solid', borderColor: selectedCategoryId === 'all' ? 'var(--primary)' : 'var(--border)',
+                                            cursor: 'pointer'
+                                        }}
+                                    >
+                                        All
+                                    </button>
+                                    {categories.map(cat => (
+                                        <button
+                                            key={cat.id}
+                                            onClick={() => setSelectedCategoryId(cat.id)}
+                                            style={{
+                                                padding: '4px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '700', whiteSpace: 'nowrap',
+                                                background: selectedCategoryId === cat.id ? 'var(--primary)' : 'rgba(255,255,255,0.06)',
+                                                color: selectedCategoryId === cat.id ? '#000' : 'var(--text)',
+                                                border: '1px solid', borderColor: selectedCategoryId === cat.id ? 'var(--primary)' : 'var(--border)',
+                                                cursor: 'pointer'
+                                            }}
+                                        >
+                                            {cat.name}
+                                        </button>
+                                    ))}
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '8px', maxHeight: '180px', overflowY: 'auto', padding: '4px' }}>
+                                    {loadingProducts ? (
+                                        <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '10px', color: 'var(--text-muted)', fontSize: '12px' }}>Loading...</div>
+                                    ) : products.map((p: any) => (
+                                        <button
+                                            key={p.id}
+                                            onClick={() => {
+                                                const existing = editCart.findIndex(i => i.productId === p.id);
+                                                if (existing >= 0) {
+                                                    const newCart = [...editCart];
+                                                    newCart[existing].qty++;
+                                                    setEditCart(newCart);
+                                                } else {
+                                                    setEditCart([...editCart, { productId: p.id, name: p.name, price: p.price, qty: 1 }]);
+                                                }
+                                            }}
+                                            style={{
+                                                padding: '8px', borderRadius: '8px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)',
+                                                color: 'var(--text)', fontSize: '12px', textAlign: 'left', cursor: 'pointer', transition: 'all 0.2s'
+                                            }}
+                                            onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--primary)'}
+                                            onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}
+                                        >
+                                            <div style={{ fontWeight: 600, marginBottom: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</div>
+                                            <div style={{ color: 'var(--primary)', fontWeight: 700 }}>EGP {Math.round(p.price)}</div>
+                                        </button>
+                                    ))}
+                                    {!loadingProducts && products.length === 0 && (
+                                        <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '10px', color: 'var(--text-muted)', fontSize: '12px' }}>No products found</div>
+                                    )}
+                                </div>
+                            </div>
                         </div>
                     </div>
 

@@ -28,10 +28,26 @@ const ProductManagement: React.FC = () => {
     const [totalPages, setTotalPages] = useState(1);
     const [totalProducts, setTotalProducts] = useState(0);
 
+    const [searchTerm, setSearchTerm] = useState('');
+    const [debouncedSearch, setDebouncedSearch] = useState('');
+    const [selectedCategoryId, setSelectedCategoryId] = useState<string>('all');
+
+    // Debounce search
+    useEffect(() => {
+        const timer = setTimeout(() => setDebouncedSearch(searchTerm), 500);
+        return () => clearTimeout(timer);
+    }, [searchTerm]);
+
     const loadData = useCallback(async () => {
         try {
+            setLoading(true);
             const [pRes, cRes] = await Promise.all([
-                adminService.getProducts({ page, pageSize }),
+                adminService.getProducts({
+                    page,
+                    pageSize,
+                    search: debouncedSearch,
+                    categoryId: selectedCategoryId === 'all' ? undefined : selectedCategoryId
+                }),
                 adminService.getCategories(),
             ]);
             setProducts(pRes.data.data || pRes.data);
@@ -47,9 +63,9 @@ const ProductManagement: React.FC = () => {
         } finally {
             setLoading(false);
         }
-    }, [formData.categoryId]);
+    }, [formData.categoryId, page, debouncedSearch, selectedCategoryId, pageSize]);
 
-    useEffect(() => { loadData(); }, [loadData, page]);
+    useEffect(() => { loadData(); }, [loadData]);
 
     const handleCreate = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -274,6 +290,39 @@ const ProductManagement: React.FC = () => {
                 </div>
             </div>
 
+            {/* Filters */}
+            <div style={{ display: 'flex', gap: '15px', alignItems: 'center', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px', flex: 1 }}>
+                    <button
+                        onClick={() => setSelectedCategoryId('all')}
+                        style={{
+                            padding: '6px 14px', borderRadius: '16px', fontSize: '12px', fontWeight: '700', whiteSpace: 'nowrap',
+                            background: selectedCategoryId === 'all' ? 'var(--primary)' : 'rgba(255,255,255,0.06)',
+                            color: selectedCategoryId === 'all' ? '#000' : 'var(--text)',
+                            border: '1px solid', borderColor: selectedCategoryId === 'all' ? 'var(--primary)' : 'var(--border)',
+                            cursor: 'pointer', transition: 'all 0.2s'
+                        }}
+                    >
+                        All Categories
+                    </button>
+                    {categories.map(cat => (
+                        <button
+                            key={cat.id}
+                            onClick={() => setSelectedCategoryId(cat.id)}
+                            style={{
+                                padding: '6px 14px', borderRadius: '16px', fontSize: '12px', fontWeight: '700', whiteSpace: 'nowrap',
+                                background: selectedCategoryId === cat.id ? 'var(--primary)' : 'rgba(255,255,255,0.06)',
+                                color: selectedCategoryId === cat.id ? '#000' : 'var(--text)',
+                                border: '1px solid', borderColor: selectedCategoryId === cat.id ? 'var(--primary)' : 'var(--border)',
+                                cursor: 'pointer', transition: 'all 0.2s'
+                            }}
+                        >
+                            {cat.name}
+                        </button>
+                    ))}
+                </div>
+            </div>
+
             {/* Category Panel */}
             {showCategoryForm && (
                 <GlassPanel style={{ padding: '25px' }}>
@@ -387,6 +436,8 @@ const ProductManagement: React.FC = () => {
                     columns={columns}
                     searchKey="name"
                     searchPlaceholder="Search products..."
+                    onSearch={setSearchTerm}
+                    loading={loading}
                     actions={(p: Product) => (
                         <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
                             {isEditing === p.id ? (
