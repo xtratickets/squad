@@ -24,8 +24,12 @@ const initSocket = (server) => {
             logger_1.logger.info({ socketId: socket.id }, 'Client disconnected');
         });
     });
+    let isBroadcasting = false;
     if (!stateBroadcastInterval) {
         stateBroadcastInterval = setInterval(async () => {
+            if (isBroadcasting)
+                return;
+            isBroadcasting = true;
             try {
                 const rooms = await prisma_service_1.prisma.room.findMany({
                     where: { status: 'occupied' },
@@ -36,33 +40,37 @@ const initSocket = (server) => {
                         },
                     },
                 });
-                const states = {};
-                for (const room of rooms) {
+                const roomsWithSessions = rooms.filter(room => room.sessions[0]);
+                const stateEntries = await Promise.all(roomsWithSessions.map(async (room) => {
                     const activeSession = room.sessions[0];
-                    if (activeSession) {
-                        const billing = await billing_service_1.BillingService.computeSessionCharge(activeSession.id, new Date());
-                        const runningTotal = billing.finalTotal;
-                        const payments = await prisma_service_1.prisma.payment.aggregate({
+                    const [billing, payments] = await Promise.all([
+                        billing_service_1.BillingService.computeSessionCharge(activeSession.id, new Date()),
+                        prisma_service_1.prisma.payment.aggregate({
                             where: { referenceType: 'session', referenceId: activeSession.id },
                             _sum: { amount: true },
-                        });
-                        const unpaidTotal = Math.max(0, runningTotal - (payments._sum.amount || 0));
-                        states[room.id] = {
+                        }),
+                    ]);
+                    const runningTotal = billing.finalTotal;
+                    const unpaidTotal = Math.max(0, runningTotal - (payments._sum.amount || 0));
+                    return [room.id, {
                             roomId: room.id,
                             activeSessionId: activeSession.id,
                             startTime: activeSession.startTime,
                             runningTotal,
                             unpaidTotal,
                             ordersOpen: activeSession.orders.length,
-                        };
-                    }
-                }
+                        }];
+                }));
+                const states = Object.fromEntries(stateEntries);
                 if (Object.keys(states).length > 0) {
                     (0, exports.broadcast)('rooms.states_update', states);
                 }
             }
             catch (error) {
                 logger_1.logger.error(error, 'Error broadcasting room states');
+            }
+            finally {
+                isBroadcasting = false;
             }
         }, 15000);
     }

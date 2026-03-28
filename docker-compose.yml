@@ -1,5 +1,5 @@
-# Docker Compose for local testing
-version: '3.8'
+# Docker Compose for local development and testing
+# For production (Dokploy), deploy the Dockerfile directly with env vars set in the dashboard.
 
 services:
   postgres:
@@ -18,25 +18,53 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
+
+  minio:
+    image: minio/minio:latest
+    container_name: squad-minio
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
 
   app:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: squad-app
+    env_file:
+      - .env.local
     environment:
       NODE_ENV: production
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/squad
       PORT: 3000
+      MINIO_ENDPOINT: minio
+      MINIO_PORT: "9000"
+      MINIO_USE_SSL: "false"
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MINIO_BUCKET: squad
     ports:
       - "3000:3000"
     depends_on:
       postgres:
         condition: service_healthy
-    volumes:
-      - ./dist:/app/dist:ro
-      - ./frontend/dist:/app/frontend/dist:ro
+      minio:
+        condition: service_healthy
     restart: unless-stopped
 
 volumes:
   postgres_data:
+  minio_data:

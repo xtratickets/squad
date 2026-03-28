@@ -299,6 +299,13 @@ const checkoutSession = async (req, res) => {
         if (!session.sessionCharge)
             return res.status(400).json({ error: 'Session has not been charged yet – end the session first' });
         const resolvedShiftId = shiftId || session.closedShiftId || session.openedShiftId;
+        const modeIds = [...new Set(payments.map((p) => p.modeId))];
+        const paymentModes = await prisma_service_1.prisma.paymentMode.findMany({ where: { id: { in: modeIds } } });
+        const modeMap = new Map(paymentModes.map(m => [m.id, m.name.toUpperCase()]));
+        for (const p of payments) {
+            if (!modeMap.has(p.modeId))
+                throw new Error(`Payment mode ${p.modeId} not found`);
+        }
         const createdPayments = await prisma_service_1.prisma.$transaction(async (tx) => {
             const result = [];
             for (const p of payments) {
@@ -313,10 +320,7 @@ const checkoutSession = async (req, res) => {
                     },
                 });
                 result.push(created);
-                const mode = await tx.paymentMode.findUnique({ where: { id: modeId } });
-                if (!mode)
-                    throw new Error(`Payment mode ${modeId} not found`);
-                const modeName = mode.name.toUpperCase();
+                const modeName = modeMap.get(modeId);
                 const updateData = {};
                 if (modeName === 'CASH')
                     updateData.paymentsCash = { increment: amount };

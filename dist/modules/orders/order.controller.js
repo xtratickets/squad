@@ -167,7 +167,7 @@ const approveOrder = async (req, res) => {
                 update: { shiftId: order.shiftId, ...charges }
             });
             const ownerUserId = order.ownerUserId;
-            if (order.type === 'owner' && ownerUserId) {
+            if (order.type === 'owner' && ownerUserId && !order.sessionId) {
                 await tx.user.update({
                     where: { id: ownerUserId },
                     data: { walletBalance: { decrement: charges.finalTotal } },
@@ -195,14 +195,16 @@ const approveOrder = async (req, res) => {
                     data: { paymentsWallet: { increment: charges.finalTotal } },
                 });
             }
-            await tx.shiftStats.update({
-                where: { shiftId: order.shiftId },
-                data: {
-                    ordersRevenue: { increment: charges.itemsTotal - charges.discount },
-                    totalRevenue: { increment: charges.itemsTotal - charges.discount },
-                    tipsTotal: { increment: charges.tip },
-                },
-            });
+            if (!order.sessionId) {
+                await tx.shiftStats.update({
+                    where: { shiftId: order.shiftId },
+                    data: {
+                        ordersRevenue: { increment: charges.itemsTotal - charges.discount },
+                        totalRevenue: { increment: charges.itemsTotal - charges.discount },
+                        tipsTotal: { increment: charges.tip },
+                    },
+                });
+            }
             if (promoCode) {
                 const p = await tx.promoCode.findUnique({ where: { code: promoCode } });
                 if (p && p.usageLimit !== null) {
@@ -276,7 +278,7 @@ const updateOrder = async (req, res) => {
                         data: { productId: item.productId, qty: item.qty, type: 'add', reference: `order_${order.id}_cancel` },
                     });
                 }
-                if (order.orderCharge) {
+                if (order.orderCharge && !order.sessionId) {
                     const charge = order.orderCharge;
                     await tx.shiftStats.update({
                         where: { shiftId: order.shiftId },
@@ -372,7 +374,7 @@ const updateOrderItems = async (req, res) => {
                         data: { productId: item.productId, qty: item.qty, type: 'add', reference: `order_${order.id}_edit_revert` }
                     });
                 }
-                if (order.type === 'owner' && order.ownerUserId) {
+                if (order.type === 'owner' && order.ownerUserId && !order.sessionId) {
                     const oldCharge = order.orderCharge;
                     await tx.user.update({
                         where: { id: order.ownerUserId },
@@ -409,7 +411,7 @@ const updateOrderItems = async (req, res) => {
                         await tx.payment.delete({ where: { id: p.id } });
                     }
                 }
-                if (order.orderCharge) {
+                if (order.orderCharge && !order.sessionId) {
                     const charge = order.orderCharge;
                     await tx.shiftStats.update({
                         where: { shiftId: order.shiftId },
@@ -468,15 +470,17 @@ const updateOrderItems = async (req, res) => {
                         finalTotal: charges.finalTotal
                     }
                 });
-                await tx.shiftStats.update({
-                    where: { shiftId: order.shiftId },
-                    data: {
-                        ordersRevenue: { increment: charges.itemsTotal - charges.discount },
-                        totalRevenue: { increment: charges.itemsTotal - charges.discount },
-                        tipsTotal: { increment: charges.tip },
-                    }
-                });
-                if (updatedOrder.type === 'owner' && updatedOrder.ownerUserId) {
+                if (!order.sessionId) {
+                    await tx.shiftStats.update({
+                        where: { shiftId: order.shiftId },
+                        data: {
+                            ordersRevenue: { increment: charges.itemsTotal - charges.discount },
+                            totalRevenue: { increment: charges.itemsTotal - charges.discount },
+                            tipsTotal: { increment: charges.tip },
+                        }
+                    });
+                }
+                if (updatedOrder.type === 'owner' && updatedOrder.ownerUserId && !order.sessionId) {
                     await tx.user.update({
                         where: { id: updatedOrder.ownerUserId },
                         data: { walletBalance: { decrement: charges.finalTotal } }
@@ -543,6 +547,13 @@ const checkoutOrder = async (req, res) => {
             return res.status(404).json({ error: 'Order not found' });
         if (!order.orderCharge)
             return res.status(400).json({ error: 'Order has not been charged yet' });
+        const modeIds = [...new Set(payments.map((p) => p.modeId))];
+        const paymentModes = await prisma_service_1.prisma.paymentMode.findMany({ where: { id: { in: modeIds } } });
+        const modeMap = new Map(paymentModes.map(m => [m.id, m.name.toUpperCase()]));
+        for (const p of payments) {
+            if (!modeMap.has(p.modeId))
+                throw new Error(`Payment mode ${p.modeId} not found`);
+        }
         const createdPayments = await prisma_service_1.prisma.$transaction(async (tx) => {
             const result = [];
             for (const p of payments) {
@@ -557,10 +568,7 @@ const checkoutOrder = async (req, res) => {
                     },
                 });
                 result.push(created);
-                const mode = await tx.paymentMode.findUnique({ where: { id: modeId } });
-                if (!mode)
-                    throw new Error(`Payment mode ${modeId} not found`);
-                const modeName = mode.name.toUpperCase();
+                const modeName = modeMap.get(modeId);
                 const updateData = {};
                 if (modeName === 'CASH')
                     updateData.paymentsCash = { increment: amount };

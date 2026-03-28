@@ -27,6 +27,7 @@ const getGlobalStats = async (req, res) => {
                 _sum: { serviceFee: true, tax: true, discount: true }
             }),
             prisma_service_1.prisma.orderCharge.aggregate({
+                where: { order: { sessionId: null } },
                 _sum: { serviceFee: true, tax: true, discount: true }
             })
         ]);

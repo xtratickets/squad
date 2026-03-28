@@ -25,9 +25,6 @@ import { errorHandler } from './middleware/error.middleware';
 
 const app = express();
 
-console.log('--- APP.TS LOADING ---');
-logger.info('--- APP.TS INITIALIZING ---');
-
 app.get('/ping', (req, res) => {
     res.json({ pong: true, time: new Date().toISOString(), env: process.env.NODE_ENV });
 });
@@ -97,15 +94,7 @@ const staticPath = candidatePaths.find(p => fs.existsSync(path.join(p, 'index.ht
 const indexHtmlPath = path.join(staticPath, 'index.html');
 const indexExists = fs.existsSync(indexHtmlPath);
 
-console.log('--- Static Serving Debug ---');
-logger.info({
-    nodeEnv: process.env.NODE_ENV,
-    __dirname,
-    staticPath,
-    indexExists,
-    cwd: process.cwd(),
-    candidatePaths,
-}, 'Static serving debug info v5');
+logger.info({ staticPath, indexExists }, 'Static serving config');
 
 if (indexExists) {
     logger.info({ staticPath }, 'Serving frontend static files');

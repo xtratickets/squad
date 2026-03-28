@@ -1,27 +1,22 @@
 providers = ["node"]
 
 [phases.setup]
-nixPkgs = ["nodejs_22", "openssl", "python3"]
+nixPkgs = ["nodejs_22", "openssl"]
 
 [phases.install]
-# Install ONLY production dependencies for lean runtime image
-# Use npm ci with synced lock files for reproducible builds
+# Install all dependencies (including dev) for both root and frontend.
+# Dev deps are required at build time (TypeScript compiler, Vite, etc.).
 cmds = [
-  "npm ci --omit=dev --omit=optional --prefer-offline --no-audit 2>&1 | grep -v 'npm warn' || true",
-  "cd frontend && npm ci --omit=dev --omit=optional --prefer-offline --no-audit 2>&1 | grep -v 'npm warn' || true"
+  "npm ci --no-audit --no-fund",
+  "cd frontend && npm ci --no-audit --no-fund"
 ]
 
 [phases.build]
-# Install full dependencies (including dev) for building
-# Run Prisma generate (automatic with npm install), then build backend & frontend
 cmds = [
-  "npm install --prefer-offline --no-audit 2>&1 | grep -v 'npm warn' || true",
-  "cd frontend && npm install --prefer-offline --no-audit 2>&1 | grep -v 'npm warn' || true",
   "npx prisma generate",
   "npm run build"
 ]
 
 [start]
-# Run database migrations (client was already generated during build)
-# Then start the application
-cmd = "npx prisma migrate deploy && npm run start:prod"
+# Run migrations then start the server
+cmd = "npx prisma migrate deploy && node dist/server.js"

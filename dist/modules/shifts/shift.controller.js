@@ -112,7 +112,7 @@ const getShiftStats = async (req, res) => {
                 }
             }),
             prisma_service_1.prisma.sessionCharge.findMany({ where: { shiftId: id } }),
-            prisma_service_1.prisma.orderCharge.findMany({ where: { shiftId: id } })
+            prisma_service_1.prisma.orderCharge.findMany({ where: { shiftId: id, order: { sessionId: null } } })
         ]);
         const totalServiceFees = round2(sessionCharges.reduce((s, c) => s + c.serviceFee, 0) + orderCharges.reduce((s, c) => s + c.serviceFee, 0));
         const totalTax = round2(sessionCharges.reduce((s, c) => s + c.tax, 0) + orderCharges.reduce((s, c) => s + c.tax, 0));
@@ -280,17 +280,15 @@ const getShiftHistory = async (req, res) => {
                     payments: paymentsWithUrls
                 };
             }) || []);
-            const settlements = await Promise.all(shift.payments
-                .filter(p => p.referenceType === 'owner')
-                .map(async (p) => {
-                const owner = await prisma_service_1.prisma.user.findUnique({
-                    where: { id: p.referenceId },
-                    select: { username: true }
-                });
-                return {
-                    ...p,
-                    ownerName: owner?.username || 'Unknown Owner'
-                };
+            const ownerPayments = shift.payments.filter(p => p.referenceType === 'owner');
+            const ownerIds = [...new Set(ownerPayments.map(p => p.referenceId).filter(Boolean))];
+            const owners = ownerIds.length > 0
+                ? await prisma_service_1.prisma.user.findMany({ where: { id: { in: ownerIds } }, select: { id: true, username: true } })
+                : [];
+            const ownerMap = new Map(owners.map(o => [o.id, o.username]));
+            const settlements = ownerPayments.map(p => ({
+                ...p,
+                ownerName: ownerMap.get(p.referenceId ?? '') || 'Unknown Owner'
             }));
             const sessionsWithCharges = shift.openedSessions;
             const standaloneOrders = shift.orders;

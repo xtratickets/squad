@@ -1,76 +1,74 @@
-# Multi-stage Dockerfile for optimized builds
-# This is more efficient than Nixpacks for Node.js applications
-
+# ============================================================
+# Stage 1: Builder — installs all deps and compiles everything
+# ============================================================
 FROM node:22-alpine AS builder
 
+# Upgrade all Alpine packages to patch OS-level vulnerabilities
+RUN apk upgrade --no-cache
+
 WORKDIR /app
 
-# Copy package files
+# Install root dependencies first (layer-cached until package.json changes)
 COPY package*.json ./
+RUN npm ci --no-audit --no-fund
 
-# Install all dependencies (including dev)
-RUN npm ci --prefer-offline --no-audit && \
-    npm cache clean --force
-
-# Copy Prisma schema
-COPY prisma ./prisma
+# Install frontend dependencies separately (layer-cached until frontend/package.json changes)
+COPY frontend/package*.json ./frontend/
+RUN cd frontend && npm ci --no-audit --no-fund
 
 # Generate Prisma client
+COPY prisma ./prisma
 RUN npx prisma generate
 
-# Copy source code
-COPY src ./src
+# Copy all source files and build
 COPY tsconfig.json ./
+COPY src ./src
 COPY frontend ./frontend
 
-# Build backend
+# Build backend (tsc) then frontend (vite)
 RUN npm run build:backend
-
-# Build frontend (this includes tsc -b in frontend)
 RUN npm run build:frontend
 
-# ============================================
-# Production stage - minimal runtime
-# ============================================
+# ============================================================
+# Stage 2: Production — minimal runtime image
+# ============================================================
 FROM node:22-alpine
+
+# Upgrade all Alpine packages to patch OS-level vulnerabilities
+RUN apk upgrade --no-cache
 
 WORKDIR /app
 
-# Install dumb-init for proper signal handling
+# dumb-init for proper PID 1 signal handling
 RUN apk add --no-cache dumb-init
 
-# Copy package files
+# Copy Prisma schema BEFORE npm ci so @prisma/client postinstall can find it
+COPY prisma ./prisma
 COPY package*.json ./
 
-# Install ONLY production dependencies
-RUN npm ci --omit=dev --prefer-offline --no-audit && \
-    npm cache clean --force
+# Install production dependencies only
+RUN npm ci --omit=dev --no-audit --no-fund
 
-# Copy Prisma files (needed at runtime)
-COPY prisma ./prisma
+# Copy pre-generated Prisma client from builder
+# (avoids a second `prisma generate` run in the production stage)
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 
-# Copy built application from builder stage
+# Copy compiled backend and built frontend
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/frontend/dist ./frontend/dist
 
-# Copy config and utils if needed at runtime
-COPY config ./config 2>/dev/null || true
-COPY public ./public 2>/dev/null || true
+# Copy static public assets
+COPY public ./public
 
-# Set environment
 ENV NODE_ENV=production
-ENV NODE_OPTIONS="--max-old-space-size=2048"
+ENV NODE_OPTIONS="--max-old-space-size=512"
 
-# Expose port
 EXPOSE 3000
 
-# Use dumb-init to handle signals properly
 ENTRYPOINT ["dumb-init", "--"]
 
-# Start application with migrations
-CMD ["sh", "-c", "npx prisma migrate deploy && npm run start:prod"]
+# Run migrations then start — NODE_ENV is already set via ENV above
+CMD ["sh", "-c", "npx prisma migrate deploy && node dist/server.js"]
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD node -e "require('http').get('http://localhost:3000/health', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD node -e "require('http').get('http://localhost:3000/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"
