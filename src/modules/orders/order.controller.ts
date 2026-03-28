@@ -618,6 +618,14 @@ export const checkoutOrder = async (req: any, res: Response) => {
         if (!order) return res.status(404).json({ error: 'Order not found' });
         if (!order.orderCharge) return res.status(400).json({ error: 'Order has not been charged yet' });
 
+        // Fetch all needed payment modes in one query before entering the transaction
+        const modeIds = [...new Set(payments.map((p: any) => p.modeId))];
+        const paymentModes = await prisma.paymentMode.findMany({ where: { id: { in: modeIds } } });
+        const modeMap = new Map(paymentModes.map(m => [m.id, m.name.toUpperCase()]));
+        for (const p of payments) {
+            if (!modeMap.has(p.modeId)) throw new Error(`Payment mode ${p.modeId} not found`);
+        }
+
         const createdPayments = await prisma.$transaction(async (tx) => {
             const result = [];
             for (const p of payments) {
@@ -634,10 +642,7 @@ export const checkoutOrder = async (req: any, res: Response) => {
                 });
                 result.push(created);
 
-                const mode = await tx.paymentMode.findUnique({ where: { id: modeId } });
-                if (!mode) throw new Error(`Payment mode ${modeId} not found`);
-
-                const modeName = mode.name.toUpperCase();
+                const modeName = modeMap.get(modeId)!;
                 const updateData: any = {};
                 if (modeName === 'CASH') updateData.paymentsCash = { increment: amount };
                 else if (modeName === 'WALLET') updateData.paymentsWallet = { increment: amount };

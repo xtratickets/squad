@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { config } from '../../config/config';
 import fs from 'fs';
 import path from 'path';
+import { promises as fsPromises } from 'fs';
 import bcrypt from 'bcryptjs';
 import { prisma } from '../../services/prisma.service';
 import { logger } from '../../utils/logger';
@@ -14,34 +15,39 @@ export const getSystemSettings = (req: Request, res: Response) => {
     });
 };
 
-export const updateSystemSettings = (req: Request, res: Response) => {
+export const updateSystemSettings = async (req: Request, res: Response) => {
     const { systemName, systemLogo } = req.body;
 
     if (systemName) config.systemName = systemName;
     if (systemLogo) config.systemLogo = systemLogo;
 
-    // Write to .env file to persist across restarts
+    // Write to .env file to persist across restarts (async to avoid blocking the event loop)
     const envPath = path.resolve(process.cwd(), '.env');
     try {
-        if (fs.existsSync(envPath)) {
-            let envContent = fs.readFileSync(envPath, 'utf8');
-
-            if (envContent.includes('SYSTEM_NAME=')) {
-                envContent = envContent.replace(/SYSTEM_NAME=.*/g, `SYSTEM_NAME="${config.systemName}"`);
-            } else {
-                envContent += `\nSYSTEM_NAME="${config.systemName}"`;
-            }
-
-            if (envContent.includes('SYSTEM_LOGO=')) {
-                envContent = envContent.replace(/SYSTEM_LOGO=.*/g, `SYSTEM_LOGO="${config.systemLogo}"`);
-            } else {
-                envContent += `\nSYSTEM_LOGO="${config.systemLogo}"`;
-            }
-
-            fs.writeFileSync(envPath, envContent);
+        try {
+            await fsPromises.access(envPath);
+        } catch {
+            // .env does not exist, skip persistence
+            return res.json({ systemName: config.systemName, systemLogo: config.systemLogo, version: '1.0.0' });
         }
+
+        let envContent = await fsPromises.readFile(envPath, 'utf8');
+
+        if (envContent.includes('SYSTEM_NAME=')) {
+            envContent = envContent.replace(/SYSTEM_NAME=.*/g, `SYSTEM_NAME="${config.systemName}"`);
+        } else {
+            envContent += `\nSYSTEM_NAME="${config.systemName}"`;
+        }
+
+        if (envContent.includes('SYSTEM_LOGO=')) {
+            envContent = envContent.replace(/SYSTEM_LOGO=.*/g, `SYSTEM_LOGO="${config.systemLogo}"`);
+        } else {
+            envContent += `\nSYSTEM_LOGO="${config.systemLogo}"`;
+        }
+
+        await fsPromises.writeFile(envPath, envContent);
     } catch (err) {
-        console.error('Failed to write to .env', err);
+        logger.error(err, 'Failed to write to .env');
     }
 
     res.json({

@@ -29,8 +29,12 @@ export const initSocket = (server: HttpServer) => {
     });
 
     // Broadcast room states periodically to all clients to replace HTTP polling
+    let isBroadcasting = false;
     if (!stateBroadcastInterval) {
         stateBroadcastInterval = setInterval(async () => {
+            // Guard against concurrent executions if DB queries take longer than the interval
+            if (isBroadcasting) return;
+            isBroadcasting = true;
             try {
                 const rooms = await prisma.room.findMany({
                     where: { status: 'occupied' },
@@ -42,37 +46,42 @@ export const initSocket = (server: HttpServer) => {
                     },
                 });
 
-                const states: Record<string, any> = {};
+                const roomsWithSessions = rooms.filter(room => room.sessions[0]);
 
-                for (const room of rooms) {
-                    const activeSession = room.sessions[0];
-                    if (activeSession) {
-                        const billing = await BillingService.computeSessionCharge(activeSession.id, new Date());
+                // Compute billing for all occupied rooms in parallel instead of sequentially
+                const stateEntries = await Promise.all(
+                    roomsWithSessions.map(async room => {
+                        const activeSession = room.sessions[0];
+                        const [billing, payments] = await Promise.all([
+                            BillingService.computeSessionCharge(activeSession.id, new Date()),
+                            prisma.payment.aggregate({
+                                where: { referenceType: 'session', referenceId: activeSession.id },
+                                _sum: { amount: true },
+                            }),
+                        ]);
+
                         const runningTotal = billing.finalTotal;
-
-                        const payments = await prisma.payment.aggregate({
-                            where: { referenceType: 'session', referenceId: activeSession.id },
-                            _sum: { amount: true },
-                        });
-
                         const unpaidTotal = Math.max(0, runningTotal - (payments._sum.amount || 0));
 
-                        states[room.id] = {
+                        return [room.id, {
                             roomId: room.id,
                             activeSessionId: activeSession.id,
                             startTime: activeSession.startTime,
                             runningTotal,
                             unpaidTotal,
                             ordersOpen: activeSession.orders.length,
-                        };
-                    }
-                }
+                        }] as const;
+                    })
+                );
 
+                const states = Object.fromEntries(stateEntries);
                 if (Object.keys(states).length > 0) {
                     broadcast('rooms.states_update', states);
                 }
             } catch (error) {
                 logger.error(error, 'Error broadcasting room states');
+            } finally {
+                isBroadcasting = false;
             }
         }, 15000);
     }
