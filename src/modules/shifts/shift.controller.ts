@@ -119,7 +119,10 @@ export const getShiftStats = async (req: Request, res: Response) => {
                 }
             }),
             prisma.sessionCharge.findMany({ where: { shiftId: id } }),
-            prisma.orderCharge.findMany({ where: { shiftId: id } })
+            // Only standalone orders (sessionId null) — session orders' fees are already
+            // captured inside the sessionCharge for their session, so including them here
+            // would double-count service fees, tax, and discounts.
+            prisma.orderCharge.findMany({ where: { shiftId: id, order: { sessionId: null } } })
         ]);
 
         const totalServiceFees = round2(sessionCharges.reduce((s, c) => s + c.serviceFee, 0) + orderCharges.reduce((s, c) => s + c.serviceFee, 0));

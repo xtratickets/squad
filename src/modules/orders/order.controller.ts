@@ -185,9 +185,11 @@ export const approveOrder = async (req: any, res: Response) => {
                 update: { shiftId: order.shiftId, ...charges }
             });
 
-            // Owner order: deduct finalTotal from owner's wallet
+            // Owner order: deduct finalTotal from owner's wallet.
+            // For session-linked owner orders, the wallet is charged at endSession (not here),
+            // because the session finalTotal covers room + all orders together.
             const ownerUserId = (order as any).ownerUserId as string | null;
-            if (order.type === 'owner' && ownerUserId) {
+            if (order.type === 'owner' && ownerUserId && !order.sessionId) {
                 await (tx as any).user.update({
                     where: { id: ownerUserId! },
                     data: { walletBalance: { decrement: charges.finalTotal } },
@@ -221,15 +223,18 @@ export const approveOrder = async (req: any, res: Response) => {
                 });
             }
 
-            // Update ShiftStats Revenue (Section 11)
-            await tx.shiftStats.update({
-                where: { shiftId: order.shiftId },
-                data: {
-                    ordersRevenue: { increment: charges.itemsTotal - charges.discount },
-                    totalRevenue: { increment: charges.itemsTotal - charges.discount },
-                    tipsTotal: { increment: charges.tip },
-                },
-            });
+            // Update ShiftStats Revenue only for standalone orders (not session-linked).
+            // Session orders are accounted for in shiftStats at endSession via the sessionCharge.
+            if (!order.sessionId) {
+                await tx.shiftStats.update({
+                    where: { shiftId: order.shiftId },
+                    data: {
+                        ordersRevenue: { increment: charges.itemsTotal - charges.discount },
+                        totalRevenue: { increment: charges.itemsTotal - charges.discount },
+                        tipsTotal: { increment: charges.tip },
+                    },
+                });
+            }
 
             if (promoCode) {
                 const p = await tx.promoCode.findUnique({ where: { code: promoCode } });
@@ -310,8 +315,10 @@ export const updateOrder = async (req: any, res: Response) => {
                     });
                 }
 
-                // 2. Revert ShiftStats revenue
-                if (order.orderCharge) {
+                // 2. Revert ShiftStats revenue and payments only for standalone orders.
+                // Session-linked orders are never directly added to shiftStats at approval
+                // (they're captured in bulk at endSession via sessionCharge).
+                if (order.orderCharge && !order.sessionId) {
                     const charge = order.orderCharge;
                     await tx.shiftStats.update({
                         where: { shiftId: order.shiftId },
@@ -417,8 +424,9 @@ export const updateOrderItems = async (req: any, res: Response) => {
                     });
                 }
 
-                // Revert owner wallet if it was an owner order
-                if (order.type === 'owner' && (order as any).ownerUserId) {
+                // For standalone (non-session) owner orders: revert wallet and payments.
+                // Session-linked owner orders are charged at endSession, not here.
+                if (order.type === 'owner' && (order as any).ownerUserId && !order.sessionId) {
                     const oldCharge = order.orderCharge!;
                     await (tx as any).user.update({
                         where: { id: (order as any).ownerUserId },
@@ -457,8 +465,9 @@ export const updateOrderItems = async (req: any, res: Response) => {
                     }
                 }
 
-                // Revert ShiftStats Revenue
-                if (order.orderCharge) {
+                // Revert ShiftStats Revenue only for standalone orders.
+                // Session orders' stats are owned by endSession/sessionCharge.
+                if (order.orderCharge && !order.sessionId) {
                     const charge = order.orderCharge;
                     await tx.shiftStats.update({
                         where: { shiftId: order.shiftId },
@@ -527,18 +536,20 @@ export const updateOrderItems = async (req: any, res: Response) => {
                     }
                 });
 
-                // Apply new Revenue Stats
-                await tx.shiftStats.update({
-                    where: { shiftId: order.shiftId },
-                    data: {
-                        ordersRevenue: { increment: charges.itemsTotal - charges.discount },
-                        totalRevenue: { increment: charges.itemsTotal - charges.discount },
-                        tipsTotal: { increment: charges.tip },
-                    }
-                });
+                // Apply new Revenue Stats only for standalone orders.
+                if (!order.sessionId) {
+                    await tx.shiftStats.update({
+                        where: { shiftId: order.shiftId },
+                        data: {
+                            ordersRevenue: { increment: charges.itemsTotal - charges.discount },
+                            totalRevenue: { increment: charges.itemsTotal - charges.discount },
+                            tipsTotal: { increment: charges.tip },
+                        }
+                    });
+                }
 
-                // Apply new Owner Wallet deduction if applicable
-                if (updatedOrder.type === 'owner' && (updatedOrder as any).ownerUserId) {
+                // Apply new Owner Wallet deduction only for standalone owner orders.
+                if (updatedOrder.type === 'owner' && (updatedOrder as any).ownerUserId && !order.sessionId) {
                     await (tx as any).user.update({
                         where: { id: (updatedOrder as any).ownerUserId },
                         data: { walletBalance: { decrement: charges.finalTotal } }

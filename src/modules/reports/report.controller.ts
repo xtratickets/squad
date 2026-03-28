@@ -30,7 +30,9 @@ export const getGlobalStats = async (req: Request, res: Response) => {
             prisma.sessionCharge.aggregate({
                 _sum: { serviceFee: true, tax: true, discount: true }
             }),
+            // Exclude session-linked orders — their fees are already included in sessionCharge.
             prisma.orderCharge.aggregate({
+                where: { order: { sessionId: null } },
                 _sum: { serviceFee: true, tax: true, discount: true }
             })
         ]);
