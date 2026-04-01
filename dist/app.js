@@ -28,8 +28,6 @@ const wallet_routes_1 = __importDefault(require("./modules/wallet/wallet.routes"
 const owner_routes_1 = __importDefault(require("./modules/owners/owner.routes"));
 const error_middleware_1 = require("./middleware/error.middleware");
 const app = (0, express_1.default)();
-console.log('--- APP.TS LOADING ---');
-logger_1.logger.info('--- APP.TS INITIALIZING ---');
 app.get('/ping', (req, res) => {
     res.json({ pong: true, time: new Date().toISOString(), env: process.env.NODE_ENV });
 });
@@ -83,15 +81,7 @@ const candidatePaths = [
 const staticPath = candidatePaths.find(p => fs_1.default.existsSync(path_1.default.join(p, 'index.html'))) ?? candidatePaths[0];
 const indexHtmlPath = path_1.default.join(staticPath, 'index.html');
 const indexExists = fs_1.default.existsSync(indexHtmlPath);
-console.log('--- Static Serving Debug ---');
-logger_1.logger.info({
-    nodeEnv: process.env.NODE_ENV,
-    __dirname,
-    staticPath,
-    indexExists,
-    cwd: process.cwd(),
-    candidatePaths,
-}, 'Static serving debug info v5');
+logger_1.logger.info({ staticPath, indexExists }, 'Static serving config');
 if (indexExists) {
     logger_1.logger.info({ staticPath }, 'Serving frontend static files');
     app.use(express_1.default.static(staticPath));

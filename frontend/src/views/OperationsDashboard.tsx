@@ -209,52 +209,56 @@ const SessionsTab: React.FC = () => {
                 </GlassPanel>
             )}
 
-            {/* Discount Panel */}
-            {discountSession && (
-                <GlassPanel style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <h3 style={{ margin: 0, fontSize: '16px' }}>
-                            Apply Promo Code — {discountSession.room?.name ?? '—'}
-                            {discountSession.sessionCharge?.finalTotal != null && (
-                                <span style={{ marginLeft: '10px', fontSize: '13px', color: 'var(--text-muted)', fontWeight: 400 }}>
-                                    Current Total: EGP {Math.round(discountSession.sessionCharge.finalTotal)}
-                                </span>
-                            )}
-                        </h3>
-                        <button onClick={() => setDiscountSession(null)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><X size={18} /></button>
-                    </div>
-                    <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+            {/* Discount Modal */}
+            <Modal
+                isOpen={!!discountSession}
+                onClose={() => { setDiscountSession(null); setPromoCode(''); }}
+                title={`Apply Promo Code — ${discountSession?.room?.name ?? ''}`}
+                maxWidth="420px"
+            >
+                {discountSession && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                        {discountSession.sessionCharge?.finalTotal != null && (
+                            <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+                                Current Total: <strong style={{ color: 'white' }}>EGP {Math.round(discountSession.sessionCharge.finalTotal)}</strong>
+                                {discountSession.sessionCharge.promoCode && (
+                                    <span style={{ marginLeft: '8px', fontSize: '11px', color: '#f59e0b' }}>
+                                        (code: {discountSession.sessionCharge.promoCode})
+                                    </span>
+                                )}
+                            </div>
+                        )}
                         <Input
                             label="Promo Code"
                             type="text"
                             value={promoCode}
                             onChange={e => setPromoCode(e.target.value.toUpperCase())}
-                            style={{ flex: 1, minWidth: '180px' }}
                         />
                         <div style={{ display: 'flex', gap: '10px' }}>
-                            <Button onClick={applyDiscount} size="small" variant="primary" disabled={savingDiscount}>
+                            <Button onClick={applyDiscount} variant="primary" disabled={savingDiscount} style={{ flex: 1 }}>
                                 <Check size={14} /> {savingDiscount ? 'Applying...' : 'Apply Code'}
                             </Button>
-                            <Button onClick={() => setDiscountSession(null)} size="small" variant="secondary"><X size={14} /> Cancel</Button>
+                            <Button onClick={() => { setDiscountSession(null); setPromoCode(''); }} variant="secondary">
+                                <X size={14} /> Cancel
+                            </Button>
                         </div>
                     </div>
-                </GlassPanel>
-            )}
+                )}
+            </Modal>
 
-            {/* Post-Discount Payment Step */}
-            {pdStep && (
-                <GlassPanel style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px', border: '1px solid var(--primary)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <h3 style={{ margin: 0, fontSize: '16px' }}>
-                            Record Payment — {pdStep.session.room?.name ?? '—'}
-                            <span style={{ marginLeft: '10px', fontSize: '13px', color: 'var(--primary)', fontWeight: 700 }}>
-                                New Total: EGP {Math.round(pdStep.newTotal)}
-                            </span>
-                        </h3>
-                        <button onClick={() => setPdStep(null)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><X size={18} /></button>
-                    </div>
-                    <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flex: 1, minWidth: '160px' }}>
+            {/* Post-Discount Payment Modal */}
+            <Modal
+                isOpen={!!pdStep}
+                onClose={() => setPdStep(null)}
+                title={`Record Payment — ${pdStep?.session?.room?.name ?? ''}`}
+                maxWidth="420px"
+            >
+                {pdStep && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                        <div style={{ fontSize: '14px', padding: '10px', background: 'rgba(var(--primary-rgb),0.1)', borderRadius: '8px', textAlign: 'center' }}>
+                            New Total after discount: <strong style={{ color: 'var(--primary)', fontSize: '18px' }}>EGP {Math.round(pdStep.newTotal)}</strong>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                             <label style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px' }}>Payment Mode</label>
                             <select
                                 value={pdModeId}
@@ -270,17 +274,18 @@ const SessionsTab: React.FC = () => {
                             min="0"
                             value={pdAmount}
                             onChange={e => setPdAmount(e.target.value)}
-                            style={{ flex: 1, minWidth: '140px' }}
                         />
                         <div style={{ display: 'flex', gap: '10px' }}>
-                            <Button onClick={confirmDiscountPayment} size="small" variant="primary" disabled={savingPdPayment}>
+                            <Button onClick={confirmDiscountPayment} variant="primary" disabled={savingPdPayment} style={{ flex: 1 }}>
                                 <Check size={14} /> {savingPdPayment ? 'Saving...' : 'Confirm Payment'}
                             </Button>
-                            <Button onClick={() => setPdStep(null)} size="small" variant="secondary"><X size={14} /> Skip</Button>
+                            <Button onClick={() => setPdStep(null)} variant="secondary">
+                                <X size={14} /> Skip
+                            </Button>
                         </div>
                     </div>
-                </GlassPanel>
-            )}
+                )}
+            </Modal>
 
             {loading ? <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>Loading sessions...</div> : (
                 <DataTable

@@ -433,20 +433,32 @@ const cancelSession = async (req, res) => {
 exports.cancelSession = cancelSession;
 const updateSessionDiscount = async (req, res) => {
     const id = req.params.id;
-    const { discount } = req.body;
+    const { promoCode } = req.body;
     const userId = req.user.userId;
     try {
         const session = await prisma_service_1.prisma.session.findUnique({
             where: { id },
-            include: { sessionCharge: true, orders: { include: { orderCharge: true } } }
+            include: {
+                sessionCharge: true,
+                orders: { include: { orderCharge: true } },
+            },
         });
         if (!session || session.status !== 'closed' || !session.sessionCharge) {
             return res.status(404).json({ error: 'Charged session not found' });
         }
+        const promo = await prisma_service_1.prisma.promoCode.findUnique({ where: { code: promoCode } });
+        if (!promo || !promo.active || (promo.usageLimit !== null && promo.usageLimit <= 0) || (promo.expiry && promo.expiry <= new Date())) {
+            return res.status(400).json({ error: 'Invalid or expired promo code' });
+        }
         const oldCharge = session.sessionCharge;
         const shiftId = session.closedShiftId;
         const endTime = session.endTime;
-        const newCharges = await billing_service_1.BillingService.computeSessionCharge(id, endTime, discount, oldCharge.tip);
+        const roomAmount = oldCharge.roomAmount;
+        const ordersAmount = oldCharge.ordersAmount;
+        const applyTo = promo.applyTo ?? 'both';
+        const base = applyTo === 'room' ? roomAmount : applyTo === 'orders' ? ordersAmount : roomAmount + ordersAmount;
+        const discountAmount = promo.type === 'percent' ? (base * promo.value) / 100 : Math.min(promo.value, base);
+        const newCharges = await billing_service_1.BillingService.computeSessionCharge(id, endTime, discountAmount, oldCharge.tip);
         const result = await prisma_service_1.prisma.$transaction(async (tx) => {
             await tx.sessionCharge.update({
                 where: { sessionId: id },
@@ -455,8 +467,15 @@ const updateSessionDiscount = async (req, res) => {
                     serviceFee: newCharges.serviceFee,
                     tax: newCharges.tax,
                     finalTotal: newCharges.finalTotal,
+                    promoCode,
                 },
             });
+            if (promo.usageLimit !== null) {
+                await tx.promoCode.update({
+                    where: { code: promoCode },
+                    data: { usageLimit: { decrement: 1 } },
+                });
+            }
             const diffRevenue = (newCharges.finalTotal - newCharges.tip) - (oldCharge.finalTotal - oldCharge.tip);
             if (diffRevenue !== 0) {
                 await tx.shiftStats.update({
@@ -476,24 +495,24 @@ const updateSessionDiscount = async (req, res) => {
                         data: {
                             userId: ownerOrder.ownerUserId,
                             amount: -diffFinal,
-                            note: `DISCOUNT Adjustment: #${session.id.slice(0, 8)}`,
-                            shiftId: shiftId,
+                            note: `PROMO Discount (${promoCode}): #${session.id.slice(0, 8)}`,
+                            shiftId,
                         },
                     });
                     const walletMode = await tx.paymentMode.findFirst({
-                        where: { name: { equals: 'Wallet', mode: 'insensitive' } }
+                        where: { name: { equals: 'Wallet', mode: 'insensitive' } },
                     });
                     const payment = await tx.payment.findFirst({
-                        where: { referenceType: 'session', referenceId: id, modeId: walletMode?.id || 'none' }
+                        where: { referenceType: 'session', referenceId: id, modeId: walletMode?.id || 'none' },
                     });
                     if (payment) {
                         await tx.payment.update({
                             where: { id: payment.id },
-                            data: { amount: newCharges.finalTotal }
+                            data: { amount: newCharges.finalTotal },
                         });
                         await tx.shiftStats.update({
                             where: { shiftId },
-                            data: { paymentsWallet: { increment: diffFinal } }
+                            data: { paymentsWallet: { increment: diffFinal } },
                         });
                     }
                 }
@@ -501,6 +520,7 @@ const updateSessionDiscount = async (req, res) => {
             return newCharges;
         });
         await audit_service_1.AuditService.log('Session', id, 'UPDATE_DISCOUNT', userId, oldCharge, result);
+        await receipt_service_1.ReceiptService.createSnapshot('session', id);
         res.json(result);
     }
     catch (error) {
