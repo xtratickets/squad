@@ -5,6 +5,7 @@ import { assignOwnerToSession } from '../owners/owner.controller';
 
 const router = Router();
 
+router.get('/', authenticate, authorize(['OPERATION', 'ADMIN']), sessionController.listSessions);
 router.get('/:id', authenticate, sessionController.getSession);
 router.post('/start', authenticate, sessionController.startSession);
 router.post('/:id/end', authenticate, sessionController.endSession);

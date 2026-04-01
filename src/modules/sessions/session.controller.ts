@@ -6,6 +6,38 @@ import { emitToRoom, broadcast } from '../../websocket/socket';
 import { AuditService } from '../../services/audit.service';
 import { ReceiptService } from '../../services/receipt.service';
 
+export const listSessions = async (req: Request, res: Response) => {
+    const page = parseInt(req.query.page as string) || 1;
+    const pageSize = parseInt(req.query.pageSize as string) || 20;
+
+    try {
+        const [sessions, total] = await Promise.all([
+            prisma.session.findMany({
+                orderBy: { startTime: 'desc' },
+                skip: (page - 1) * pageSize,
+                take: pageSize,
+                include: {
+                    room: { select: { id: true, name: true } },
+                    sessionCharge: true,
+                    openedShift: { include: { staff: { select: { username: true } } } },
+                    payments: { include: { mode: true } },
+                },
+            }),
+            prisma.session.count(),
+        ]);
+
+        const data = sessions.map((s: any) => ({
+            ...s,
+            staffUsername: (s as any).openedShift?.staff?.username ?? null,
+        }));
+
+        res.json({ data, total, page, pageSize, totalPages: Math.ceil(total / pageSize) });
+    } catch (error) {
+        logger.error(error, 'Error listing sessions');
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
 export const getSession = async (req: Request, res: Response) => {
     const id = req.params.id as string;
     try {

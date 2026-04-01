@@ -34,6 +34,8 @@ const TABS: { key: Tab; label: string; icon: React.ReactNode }[] = [
 const SessionsTab: React.FC = () => {
     const [sessions, setSessions] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
+    const [page, setPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
     const [editing, setEditing] = useState<any | null>(null);
     const [form, setForm] = useState({ startTime: '', endTime: '' });
     const [modes, setModes] = useState<any[]>([]);
@@ -49,24 +51,21 @@ const SessionsTab: React.FC = () => {
     const [pdAmount, setPdAmount] = useState('');
     const [savingPdPayment, setSavingPdPayment] = useState(false);
 
-    const load = async () => {
+    const load = async (p = page) => {
         setLoading(true);
         try {
-            const res = await api.get('/shifts/all?pageSize=200');
-            const shifts = res.data?.data ?? [];
-            if (res.data?.modes) setModes(res.data.modes);
-            const flat: any[] = [];
-            for (const shift of shifts) {
-                for (const s of (shift.openedSessions ?? [])) {
-                    flat.push({ ...s, staffUsername: shift.staff?.username });
-                }
-            }
-            setSessions(flat.sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime()));
+            const [sessRes, modesRes] = await Promise.all([
+                api.get(`/sessions?page=${p}&pageSize=20`),
+                api.get('/payments/modes'),
+            ]);
+            setSessions(sessRes.data.data ?? []);
+            setTotalPages(sessRes.data.totalPages ?? 1);
+            setModes(modesRes.data ?? []);
         } catch { toast.error('Failed to load sessions'); }
         finally { setLoading(false); }
     };
 
-    useEffect(() => { void load(); }, []);
+    useEffect(() => { void load(page); }, [page]);
 
     const openEdit = (s: any) => {
         setEditing(s);
@@ -85,7 +84,7 @@ const SessionsTab: React.FC = () => {
             });
             toast.success('Session updated');
             setEditing(null);
-            void load();
+            void load(page);
         } catch { toast.error('Failed to update session'); }
     };
 
@@ -126,7 +125,7 @@ const SessionsTab: React.FC = () => {
             setPdModeId(modes[0]?.id ?? '');
             setDiscountSession(null);
             setPromoCode('');
-            void load();
+            void load(page);
         } catch (err: any) {
             toast.error(err?.response?.data?.error ?? 'Failed to apply promo code');
         }
@@ -148,7 +147,7 @@ const SessionsTab: React.FC = () => {
             setPdStep(null);
             setPdModeId('');
             setPdAmount('');
-            void load();
+            void load(page);
         } catch { toast.error('Failed to record payment'); }
         finally { setSavingPdPayment(false); }
     };
@@ -333,7 +332,7 @@ const SessionsTab: React.FC = () => {
                                         try {
                                             await api.post(`/sessions/${s.id}/cancel`);
                                             toast.success('Session cancelled and reversed');
-                                            void load();
+                                            void load(page);
                                         } catch { toast.error('Failed to cancel session'); }
                                     }
                                 }}>
@@ -343,6 +342,18 @@ const SessionsTab: React.FC = () => {
                         </div>
                     )}
                 />
+                {/* Pagination */}
+                {totalPages > 1 && (
+                    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '12px', paddingTop: '12px' }}>
+                        <Button size="small" variant="secondary" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>
+                            <ChevronLeft size={14} />
+                        </Button>
+                        <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Page {page} of {totalPages}</span>
+                        <Button size="small" variant="secondary" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}>
+                            <ChevronRight size={14} />
+                        </Button>
+                    </div>
+                )}
             )}
 
             <Modal
