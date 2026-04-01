@@ -13,7 +13,7 @@ import ReservationsManagement from './Admin/ReservationsManagement';
 import ProductSales from './Admin/ProductSales';
 import {
     Layers, ShoppingCart, CreditCard, Calendar, Package,
-    DollarSign, Clock, Edit3, X, Check, Printer, ChevronLeft, ChevronRight, BarChart3
+    DollarSign, Clock, Edit3, X, Check, Printer, ChevronLeft, ChevronRight, BarChart3, Percent
 } from 'lucide-react';
 
 type Tab = 'sessions' | 'orders' | 'payments' | 'reservations' | 'products' | 'expenses' | 'shifts' | 'sales';
@@ -41,6 +41,13 @@ const SessionsTab: React.FC = () => {
     const [localPayments, setLocalPayments] = useState<any[]>([]);
     const [savingPayment, setSavingPayment] = useState(false);
     const [viewingReceipt, setViewingReceipt] = useState<string | null>(null);
+    const [discountSession, setDiscountSession] = useState<any | null>(null);
+    const [promoCode, setPromoCode] = useState('');
+    const [savingDiscount, setSavingDiscount] = useState(false);
+    const [pdStep, setPdStep] = useState<{ session: any; newTotal: number } | null>(null);
+    const [pdModeId, setPdModeId] = useState('');
+    const [pdAmount, setPdAmount] = useState('');
+    const [savingPdPayment, setSavingPdPayment] = useState(false);
 
     const load = async () => {
         setLoading(true);
@@ -101,6 +108,51 @@ const SessionsTab: React.FC = () => {
         finally { setSavingPayment(false); }
     };
 
+    const openDiscount = (s: any) => {
+        setDiscountSession(s);
+        setPromoCode(s.sessionCharge?.promoCode ?? '');
+    };
+
+    const applyDiscount = async () => {
+        if (!discountSession) return;
+        if (!promoCode.trim()) { toast.error('Enter a promo code'); return; }
+        setSavingDiscount(true);
+        try {
+            const res = await api.post(`/sessions/${discountSession.id}/discount`, { promoCode: promoCode.trim().toUpperCase() });
+            const newCharges = res.data;
+            toast.success('Promo code applied — record the updated payment below');
+            setPdStep({ session: discountSession, newTotal: newCharges.finalTotal });
+            setPdAmount(String(Math.round(newCharges.finalTotal)));
+            setPdModeId(modes[0]?.id ?? '');
+            setDiscountSession(null);
+            setPromoCode('');
+            void load();
+        } catch (err: any) {
+            toast.error(err?.response?.data?.error ?? 'Failed to apply promo code');
+        }
+        finally { setSavingDiscount(false); }
+    };
+
+    const confirmDiscountPayment = async () => {
+        if (!pdStep) return;
+        const amount = parseFloat(pdAmount);
+        if (!pdModeId || isNaN(amount) || amount < 0) { toast.error('Enter valid payment details'); return; }
+        setSavingPdPayment(true);
+        try {
+            const shiftId = pdStep.session.closedShiftId || pdStep.session.openedShiftId;
+            await api.post(`/sessions/${pdStep.session.id}/checkout`, {
+                payments: [{ modeId: pdModeId, amount }],
+                shiftId,
+            });
+            toast.success('Payment recorded');
+            setPdStep(null);
+            setPdModeId('');
+            setPdAmount('');
+            void load();
+        } catch { toast.error('Failed to record payment'); }
+        finally { setSavingPdPayment(false); }
+    };
+
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             {editing && (
@@ -157,6 +209,79 @@ const SessionsTab: React.FC = () => {
                 </GlassPanel>
             )}
 
+            {/* Discount Panel */}
+            {discountSession && (
+                <GlassPanel style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <h3 style={{ margin: 0, fontSize: '16px' }}>
+                            Apply Promo Code — {discountSession.room?.name ?? '—'}
+                            {discountSession.sessionCharge?.finalTotal != null && (
+                                <span style={{ marginLeft: '10px', fontSize: '13px', color: 'var(--text-muted)', fontWeight: 400 }}>
+                                    Current Total: EGP {Math.round(discountSession.sessionCharge.finalTotal)}
+                                </span>
+                            )}
+                        </h3>
+                        <button onClick={() => setDiscountSession(null)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><X size={18} /></button>
+                    </div>
+                    <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                        <Input
+                            label="Promo Code"
+                            type="text"
+                            value={promoCode}
+                            onChange={e => setPromoCode(e.target.value.toUpperCase())}
+                            style={{ flex: 1, minWidth: '180px' }}
+                        />
+                        <div style={{ display: 'flex', gap: '10px' }}>
+                            <Button onClick={applyDiscount} size="small" variant="primary" disabled={savingDiscount}>
+                                <Check size={14} /> {savingDiscount ? 'Applying...' : 'Apply Code'}
+                            </Button>
+                            <Button onClick={() => setDiscountSession(null)} size="small" variant="secondary"><X size={14} /> Cancel</Button>
+                        </div>
+                    </div>
+                </GlassPanel>
+            )}
+
+            {/* Post-Discount Payment Step */}
+            {pdStep && (
+                <GlassPanel style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px', border: '1px solid var(--primary)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <h3 style={{ margin: 0, fontSize: '16px' }}>
+                            Record Payment — {pdStep.session.room?.name ?? '—'}
+                            <span style={{ marginLeft: '10px', fontSize: '13px', color: 'var(--primary)', fontWeight: 700 }}>
+                                New Total: EGP {Math.round(pdStep.newTotal)}
+                            </span>
+                        </h3>
+                        <button onClick={() => setPdStep(null)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><X size={18} /></button>
+                    </div>
+                    <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flex: 1, minWidth: '160px' }}>
+                            <label style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px' }}>Payment Mode</label>
+                            <select
+                                value={pdModeId}
+                                onChange={e => setPdModeId(e.target.value)}
+                                style={{ background: 'rgba(0,0,0,0.4)', color: 'white', border: '1px solid var(--primary)', borderRadius: '8px', padding: '8px 12px', fontSize: '13px', cursor: 'pointer' }}
+                            >
+                                {modes.map(m => <option key={m.id} value={m.id} style={{ background: '#111' }}>{m.name}</option>)}
+                            </select>
+                        </div>
+                        <Input
+                            label="Amount (EGP)"
+                            type="number"
+                            min="0"
+                            value={pdAmount}
+                            onChange={e => setPdAmount(e.target.value)}
+                            style={{ flex: 1, minWidth: '140px' }}
+                        />
+                        <div style={{ display: 'flex', gap: '10px' }}>
+                            <Button onClick={confirmDiscountPayment} size="small" variant="primary" disabled={savingPdPayment}>
+                                <Check size={14} /> {savingPdPayment ? 'Saving...' : 'Confirm Payment'}
+                            </Button>
+                            <Button onClick={() => setPdStep(null)} size="small" variant="secondary"><X size={14} /> Skip</Button>
+                        </div>
+                    </div>
+                </GlassPanel>
+            )}
+
             {loading ? <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>Loading sessions...</div> : (
                 <DataTable
                     data={sessions}
@@ -185,13 +310,18 @@ const SessionsTab: React.FC = () => {
                         { header: 'Payments', key: 'payments', render: (s: any) => <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>{(s.payments ?? []).length} paid</span> },
                     ]}
                     actions={(s: any) => (
-                        <div style={{ display: 'flex', gap: '6px' }}>
+                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                             <Button size="small" variant="secondary" onClick={() => openEdit(s)}>
                                 <Edit3 size={13} /> Times
                             </Button>
                             <Button size="small" variant="secondary" onClick={() => openPayments(s)}>
                                 <CreditCard size={13} /> Payments
                             </Button>
+                            {s.status === 'closed' && s.sessionCharge && (
+                                <Button size="small" variant="secondary" onClick={() => openDiscount(s)}>
+                                    <Percent size={13} /> Discount
+                                </Button>
+                            )}
                             {s.status !== 'cancelled' && (
                                 <Button size="small" variant="danger" onClick={async () => {
                                     if (window.confirm(`Are you sure you want to CANCEL session in ${s.room?.name}? This will reverse ALL revenue and payments associated with this session.`)) {
