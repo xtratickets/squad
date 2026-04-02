@@ -38,6 +38,7 @@ const sessionController = __importStar(require("./session.controller"));
 const auth_middleware_1 = require("../../middleware/auth.middleware");
 const owner_controller_1 = require("../owners/owner.controller");
 const router = (0, express_1.Router)();
+router.get('/', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)(['OPERATION', 'ADMIN']), sessionController.listSessions);
 router.get('/:id', auth_middleware_1.authenticate, sessionController.getSession);
 router.post('/start', auth_middleware_1.authenticate, sessionController.startSession);
 router.post('/:id/end', auth_middleware_1.authenticate, sessionController.endSession);

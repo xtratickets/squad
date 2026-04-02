@@ -1,12 +1,42 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.updateSessionDiscount = exports.cancelSession = exports.checkoutSession = exports.updateSession = exports.resumeSession = exports.pauseSession = exports.endSession = exports.startSession = exports.getSession = void 0;
+exports.updateSessionDiscount = exports.cancelSession = exports.checkoutSession = exports.updateSession = exports.resumeSession = exports.pauseSession = exports.endSession = exports.startSession = exports.getSession = exports.listSessions = void 0;
 const prisma_service_1 = require("../../services/prisma.service");
 const billing_service_1 = require("../../services/billing.service");
 const logger_1 = require("../../utils/logger");
 const socket_1 = require("../../websocket/socket");
 const audit_service_1 = require("../../services/audit.service");
 const receipt_service_1 = require("../../services/receipt.service");
+const listSessions = async (req, res) => {
+    const page = parseInt(req.query.page) || 1;
+    const pageSize = parseInt(req.query.pageSize) || 20;
+    try {
+        const [sessions, total] = await Promise.all([
+            prisma_service_1.prisma.session.findMany({
+                orderBy: { startTime: 'desc' },
+                skip: (page - 1) * pageSize,
+                take: pageSize,
+                include: {
+                    room: { select: { id: true, name: true } },
+                    sessionCharge: true,
+                    openedShift: { include: { staff: { select: { username: true } } } },
+                    payments: { include: { mode: true } },
+                },
+            }),
+            prisma_service_1.prisma.session.count(),
+        ]);
+        const data = sessions.map((s) => ({
+            ...s,
+            staffUsername: s.openedShift?.staff?.username ?? null,
+        }));
+        res.json({ data, total, page, pageSize, totalPages: Math.ceil(total / pageSize) });
+    }
+    catch (error) {
+        logger_1.logger.error(error, 'Error listing sessions');
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+exports.listSessions = listSessions;
 const getSession = async (req, res) => {
     const id = req.params.id;
     try {
