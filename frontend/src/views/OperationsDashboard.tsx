@@ -55,7 +55,7 @@ const SessionsTab: React.FC = () => {
         setLoading(true);
         try {
             const [sessRes, modesRes] = await Promise.all([
-                api.get(`/sessions?page=${p}&pageSize=20`),
+                api.get(`/sessions?page=${p}&pageSize=10`),
                 api.get('/payments/modes'),
             ]);
             setSessions(sessRes.data.data ?? []);
