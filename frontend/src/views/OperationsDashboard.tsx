@@ -342,18 +342,19 @@ const SessionsTab: React.FC = () => {
                         </div>
                     )}
                 />
-                {/* Pagination */}
-                {totalPages > 1 && (
-                    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '12px', paddingTop: '12px' }}>
-                        <Button size="small" variant="secondary" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>
-                            <ChevronLeft size={14} />
-                        </Button>
-                        <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Page {page} of {totalPages}</span>
-                        <Button size="small" variant="secondary" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}>
-                            <ChevronRight size={14} />
-                        </Button>
-                    </div>
-                )}
+            )}
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '12px', paddingTop: '12px' }}>
+                    <Button size="small" variant="secondary" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>
+                        <ChevronLeft size={14} />
+                    </Button>
+                    <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Page {page} of {totalPages}</span>
+                    <Button size="small" variant="secondary" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}>
+                        <ChevronRight size={14} />
+                    </Button>
+                </div>
             )}
 
             <Modal
