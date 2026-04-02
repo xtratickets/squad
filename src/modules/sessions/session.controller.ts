@@ -20,15 +20,27 @@ export const listSessions = async (req: Request, res: Response) => {
                     room: { select: { id: true, name: true } },
                     sessionCharge: true,
                     openedShift: { include: { staff: { select: { username: true } } } },
-                    payments: { include: { mode: true } },
                 },
             }),
             prisma.session.count(),
         ]);
 
+        const sessionIds = sessions.map(s => s.id);
+        const payments = await prisma.payment.findMany({
+            where: { referenceType: 'session', referenceId: { in: sessionIds } },
+            include: { mode: true },
+        });
+
+        const paymentsBySession = payments.reduce((acc: Record<string, any[]>, p) => {
+            if (!acc[p.referenceId]) acc[p.referenceId] = [];
+            acc[p.referenceId].push(p);
+            return acc;
+        }, {});
+
         const data = sessions.map((s: any) => ({
             ...s,
-            staffUsername: (s as any).openedShift?.staff?.username ?? null,
+            staffUsername: s.openedShift?.staff?.username ?? null,
+            payments: paymentsBySession[s.id] ?? [],
         }));
 
         res.json({ data, total, page, pageSize, totalPages: Math.ceil(total / pageSize) });

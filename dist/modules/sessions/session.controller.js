@@ -20,14 +20,25 @@ const listSessions = async (req, res) => {
                     room: { select: { id: true, name: true } },
                     sessionCharge: true,
                     openedShift: { include: { staff: { select: { username: true } } } },
-                    payments: { include: { mode: true } },
                 },
             }),
             prisma_service_1.prisma.session.count(),
         ]);
+        const sessionIds = sessions.map(s => s.id);
+        const payments = await prisma_service_1.prisma.payment.findMany({
+            where: { referenceType: 'session', referenceId: { in: sessionIds } },
+            include: { mode: true },
+        });
+        const paymentsBySession = payments.reduce((acc, p) => {
+            if (!acc[p.referenceId])
+                acc[p.referenceId] = [];
+            acc[p.referenceId].push(p);
+            return acc;
+        }, {});
         const data = sessions.map((s) => ({
             ...s,
             staffUsername: s.openedShift?.staff?.username ?? null,
+            payments: paymentsBySession[s.id] ?? [],
         }));
         res.json({ data, total, page, pageSize, totalPages: Math.ceil(total / pageSize) });
     }
