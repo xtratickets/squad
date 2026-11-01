@@ -1,16 +1,21 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import toast from 'react-hot-toast';
 import { adminService } from '../../services/admin.service';
-import { Plus, Trash2, Download } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 import DataTable from '../../components/common/DataTable';
 import Button from '../../components/common/Button';
 import { Input, Select } from '../../components/common/FormElements';
 import GlassPanel from '../../components/common/GlassPanel';
+import BulkActionBar from '../../components/common/BulkActionBar';
+import ExportButtons from '../../components/common/ExportButtons';
+import { useSelection, runBulk } from '../../hooks/useSelection';
 import type { Expense, Shift } from '../../types';
-import * as XLSX from 'xlsx';
 
 const ExpensesManagement: React.FC = () => {
     const [expenses, setExpenses] = useState<Expense[]>([]);
+    const sel = useSelection();
+    const { prune } = sel;
+    useEffect(() => { prune(expenses.map(e => e.id)); }, [expenses, prune]);
     const [shifts, setShifts] = useState<Shift[]>([]);
     const [isCreating, setIsCreating] = useState(false);
     const [formData, setFormData] = useState({ amount: 0, category: '', shiftId: '' });
@@ -72,29 +77,30 @@ const ExpensesManagement: React.FC = () => {
     };
 
     const filteredExpenses = useMemo(() => {
+        // Date inputs are local calendar days; compare against local day bounds.
+        const from = fromDate ? new Date(`${fromDate}T00:00:00`).getTime() : null;
+        const to = toDate ? new Date(`${toDate}T23:59:59.999`).getTime() : null;
         return expenses.filter(exp => {
             const expDate = new Date(exp.createdAt).getTime();
-            if (fromDate && expDate < new Date(fromDate).getTime()) return false;
-            if (toDate && expDate > new Date(toDate).getTime() + 86400000) return false; // Include entire toDate
+            if (from !== null && expDate < from) return false;
+            if (to !== null && expDate > to) return false;
             return true;
         });
     }, [expenses, fromDate, toDate]);
 
-    const exportToExcel = () => {
-        const worksheetData = filteredExpenses.map(exp => ({
-            'Category': exp.category,
-            'Amount (EGP)': exp.amount,
-            'Created By': exp.createdBy?.username || 'System',
-            'Date': new Date(exp.createdAt).toLocaleString(),
-        }));
-
-        const ws = XLSX.utils.json_to_sheet(worksheetData);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Expenses");
-
-        const fileName = `Expenses_${fromDate || 'All'}_to_${toDate || 'All'}.xlsx`;
-        XLSX.writeFile(wb, fileName);
+    const handleBulkDelete = async () => {
+        if (!window.confirm(`Delete ${sel.selected.size} expense(s)? Shift totals will be adjusted.`)) return;
+        await runBulk(sel.ids, id => adminService.deleteExpense(id), 'Deleted');
+        sel.clear();
+        void loadData();
     };
+
+    const exportColumns = [
+        { header: 'Category', value: (e: Expense) => e.category },
+        { header: 'Amount (EGP)', value: (e: Expense) => e.amount },
+        { header: 'Created By', value: (e: Expense) => e.createdBy?.username || 'System' },
+        { header: 'Date', value: (e: Expense) => new Date(e.createdAt).toLocaleString() },
+    ];
 
     const columns = [
         { header: 'Category', key: 'category' },
@@ -142,9 +148,13 @@ const ExpensesManagement: React.FC = () => {
                                 style={{ padding: '6px 10px', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)', color: 'var(--text)', borderRadius: '6px', fontSize: '13px' }}
                             />
                         </div>
-                        <Button variant="secondary" onClick={exportToExcel} icon={<Download size={16} />} style={{ marginLeft: '4px', padding: '6px 12px' }}>
-                            Export Excel
-                        </Button>
+                        <ExportButtons
+                            title="Expenses Report"
+                            filename={`Expenses_${fromDate || 'All'}_to_${toDate || 'All'}`}
+                            columns={exportColumns}
+                            getRows={() => filteredExpenses}
+                            summary={rows => [{ label: 'Total expenses', value: `EGP ${rows.reduce((s, e) => s + e.amount, 0).toLocaleString()}` }]}
+                        />
                     </div>
 
                     <Button onClick={() => setIsCreating(true)} icon={<Plus size={18} />}>Record Expense</Button>
@@ -174,7 +184,14 @@ const ExpensesManagement: React.FC = () => {
                 </GlassPanel>
             )}
 
+            <BulkActionBar count={sel.selected.size} onClear={sel.clear}>
+                <Button size="small" variant="secondary" onClick={handleBulkDelete} icon={<Trash2 size={14} />} style={{ color: 'var(--danger)' }}>Delete</Button>
+            </BulkActionBar>
+
             <DataTable
+                selectable
+                selectedIds={sel.selected}
+                onSelectionChange={sel.setSelected}
                 data={filteredExpenses}
                 columns={columns}
                 searchKey="category"

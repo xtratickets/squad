@@ -1,10 +1,10 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState } from 'react';
 import { adminService } from '../../services/admin.service';
-import { ArrowUpRight, ArrowDownLeft, Box, Download, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ArrowUpRight, ArrowDownLeft, Box, ChevronLeft, ChevronRight } from 'lucide-react';
 import DataTable from '../../components/common/DataTable';
 import Button from '../../components/common/Button';
+import ExportButtons from '../../components/common/ExportButtons';
 import type { StockMovement } from '../../types';
-import * as XLSX from 'xlsx';
 
 const InventoryLogs: React.FC = () => {
     const [movements, setMovements] = useState<StockMovement[]>([]);
@@ -21,7 +21,7 @@ const InventoryLogs: React.FC = () => {
     const loadData = async () => {
         setLoading(true);
         try {
-            const res = await adminService.getStockMovements({ page, pageSize });
+            const res = await adminService.getStockMovements({ page, pageSize, startDate: fromDate || undefined, endDate: toDate || undefined });
             // Handle new paginated response format
             if ('data' in res.data) {
                 setMovements(res.data.data);
@@ -39,36 +39,15 @@ const InventoryLogs: React.FC = () => {
     };
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    useEffect(() => { void loadData(); }, [page, pageSize]);
+    useEffect(() => { void loadData(); }, [page, pageSize, fromDate, toDate]);
 
-    const filteredMovements = useMemo(() => {
-        return movements.filter(m => {
-            const mDate = new Date(m.createdAt).getTime();
-            if (fromDate && mDate < new Date(fromDate).getTime()) return false;
-            if (toDate && mDate > new Date(toDate).getTime() + 86400000) return false; // Include entire toDate
-            return true;
-        });
-    }, [movements, fromDate, toDate]);
-
-    const exportToExcel = () => {
-        const worksheetData = filteredMovements.map(m => ({
-            'Product': m.product?.name ?? 'Unknown Product',
-            'Quantity': m.qty > 0 ? `+${m.qty}` : m.qty,
-            'Type': m.type.toUpperCase(),
-            'Reference': m.reference ?? '—',
-            'Date': new Date(m.createdAt).toLocaleString(),
-        }));
-
-        const ws = XLSX.utils.json_to_sheet(worksheetData);
-        // adjust column widths roughly
-        ws['!cols'] = [{ wch: 30 }, { wch: 10 }, { wch: 15 }, { wch: 25 }, { wch: 20 }];
-
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "InventoryLogs");
-
-        const fileName = `InventoryLogs_Page${page}_${fromDate || 'All'}_to_${toDate || 'All'}.xlsx`;
-        XLSX.writeFile(wb, fileName);
-    };
+    const exportColumns = [
+        { header: 'Product', value: (m: StockMovement) => m.product?.name ?? 'Unknown Product' },
+        { header: 'Quantity', value: (m: StockMovement) => m.qty },
+        { header: 'Type', value: (m: StockMovement) => m.type.toUpperCase() },
+        { header: 'Reference', value: (m: StockMovement) => m.reference ?? '' },
+        { header: 'Date', value: (m: StockMovement) => new Date(m.createdAt).toLocaleString() },
+    ];
 
     const columns = [
         {
@@ -132,7 +111,7 @@ const InventoryLogs: React.FC = () => {
                         <input
                             type="date"
                             value={fromDate}
-                            onChange={e => setFromDate(e.target.value)}
+                            onChange={e => { setFromDate(e.target.value); setPage(1); }}
                             style={{ padding: '6px 10px', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)', color: 'var(--text)', borderRadius: '6px', fontSize: '13px' }}
                         />
                     </div>
@@ -141,13 +120,20 @@ const InventoryLogs: React.FC = () => {
                         <input
                             type="date"
                             value={toDate}
-                            onChange={e => setToDate(e.target.value)}
+                            onChange={e => { setToDate(e.target.value); setPage(1); }}
                             style={{ padding: '6px 10px', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)', color: 'var(--text)', borderRadius: '6px', fontSize: '13px' }}
                         />
                     </div>
-                    <Button variant="secondary" onClick={exportToExcel} icon={<Download size={16} />} style={{ marginLeft: '4px', padding: '6px 12px' }}>
-                        Export Page
-                    </Button>
+                    <ExportButtons
+                        title="Inventory Movements"
+                        filename={`InventoryLogs_${fromDate || 'All'}_to_${toDate || 'All'}`}
+                        columns={exportColumns}
+                        getRows={async () => (await adminService.getStockMovements({ page: 1, pageSize: 10000, startDate: fromDate || undefined, endDate: toDate || undefined })).data.data}
+                        summary={rows => [
+                            { label: 'Movements', value: rows.length },
+                            { label: 'Net quantity', value: rows.reduce((s, m) => s + m.qty, 0) },
+                        ]}
+                    />
                 </div>
             </div>
 
@@ -156,7 +142,7 @@ const InventoryLogs: React.FC = () => {
                     <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>Loading logs...</div>
                 ) : (
                     <DataTable
-                        data={filteredMovements}
+                        data={movements}
                         columns={columns}
                         searchKey="reference"
                         searchPlaceholder="Search by reference..."

@@ -1,16 +1,21 @@
 import React, { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { adminService } from '../../services/admin.service';
-import { Plus, Trash2, Download, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
 import DataTable from '../../components/common/DataTable';
 import Button from '../../components/common/Button';
 import { Input, Select } from '../../components/common/FormElements';
 import GlassPanel from '../../components/common/GlassPanel';
+import BulkActionBar from '../../components/common/BulkActionBar';
+import ExportButtons from '../../components/common/ExportButtons';
+import { useSelection, runBulk } from '../../hooks/useSelection';
 import type { Salary, User, Shift } from '../../types';
-import * as XLSX from 'xlsx';
 
 const SalaryManagement: React.FC = () => {
     const [salaries, setSalaries] = useState<Salary[]>([]);
+    const sel = useSelection();
+    const { prune } = sel;
+    useEffect(() => { prune(salaries.map(s => s.id)); }, [salaries, prune]);
     const [users, setUsers] = useState<User[]>([]);
     const [shifts, setShifts] = useState<Shift[]>([]);
     const [isCreating, setIsCreating] = useState(false);
@@ -28,8 +33,8 @@ const SalaryManagement: React.FC = () => {
     const loadData = async () => {
         try {
             const [salRes, uRes, shRes] = await Promise.all([
-                adminService.getSalaries({ page, pageSize, fromDate, toDate }),
-                adminService.getUsers(),
+                adminService.getSalaries({ page, pageSize, fromDate: fromDate || undefined, toDate: toDate || undefined }),
+                adminService.getUsers({ pageSize: 500 }),
                 adminService.getShifts(),
             ]);
             setSalaries(salRes.data.data || salRes.data);
@@ -81,25 +86,19 @@ const SalaryManagement: React.FC = () => {
         }
     };
 
-    const exportToExcel = () => {
-        // Current page export logic (if full system export is needed, a backend endpoint should be built instead)
-        const worksheetData = salaries.map(sal => {
-            const user = users.find(u => u.id === sal.staffId);
-            return {
-                'Staff Member': sal.staff?.username ?? user?.username ?? '—',
-                'Amount (EGP)': sal.amount,
-                'Period': sal.period,
-                'Recorded At': new Date(sal.createdAt).toLocaleString(),
-            };
-        });
-
-        const ws = XLSX.utils.json_to_sheet(worksheetData);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Salaries");
-
-        const fileName = `Salaries_${fromDate || 'All'}_to_${toDate || 'All'}.xlsx`;
-        XLSX.writeFile(wb, fileName);
+    const handleBulkDelete = async () => {
+        if (!window.confirm(`Delete ${sel.selected.size} salary payout(s)? Shift totals will be adjusted.`)) return;
+        await runBulk(sel.ids, id => adminService.deleteSalary(id), 'Deleted');
+        sel.clear();
+        void loadData();
     };
+
+    const exportColumns = [
+        { header: 'Staff Member', value: (s: Salary) => s.staff?.username ?? users.find(u => u.id === s.staffId)?.username ?? '—' },
+        { header: 'Amount (EGP)', value: (s: Salary) => s.amount },
+        { header: 'Period', value: (s: Salary) => s.period },
+        { header: 'Recorded At', value: (s: Salary) => new Date(s.createdAt).toLocaleString() },
+    ];
 
     const columns = [
         {
@@ -144,7 +143,7 @@ const SalaryManagement: React.FC = () => {
                             <input
                                 type="date"
                                 value={fromDate}
-                                onChange={e => setFromDate(e.target.value)}
+                                onChange={e => { setFromDate(e.target.value); setPage(1); }}
                                 style={{ padding: '6px 10px', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)', color: 'var(--text)', borderRadius: '6px', fontSize: '13px' }}
                             />
                         </div>
@@ -153,13 +152,17 @@ const SalaryManagement: React.FC = () => {
                             <input
                                 type="date"
                                 value={toDate}
-                                onChange={e => setToDate(e.target.value)}
+                                onChange={e => { setToDate(e.target.value); setPage(1); }}
                                 style={{ padding: '6px 10px', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)', color: 'var(--text)', borderRadius: '6px', fontSize: '13px' }}
                             />
                         </div>
-                        <Button variant="secondary" onClick={exportToExcel} icon={<Download size={16} />} style={{ marginLeft: '4px', padding: '6px 12px' }}>
-                            Export Excel
-                        </Button>
+                        <ExportButtons
+                            title="Salaries Report"
+                            filename={`Salaries_${fromDate || 'All'}_to_${toDate || 'All'}`}
+                            columns={exportColumns}
+                            getRows={async () => (await adminService.getSalaries({ page: 1, pageSize: 10000, fromDate: fromDate || undefined, toDate: toDate || undefined })).data.data}
+                            summary={rows => [{ label: 'Total paid', value: `EGP ${rows.reduce((s, r) => s + r.amount, 0).toLocaleString()}` }]}
+                        />
                     </div>
 
                     <Button onClick={() => setIsCreating(true)} icon={<Plus size={18} />}>Record Payout</Button>
@@ -196,7 +199,14 @@ const SalaryManagement: React.FC = () => {
             )}
 
             <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <BulkActionBar count={sel.selected.size} onClear={sel.clear}>
+                    <Button size="small" variant="secondary" onClick={handleBulkDelete} icon={<Trash2 size={14} />} style={{ color: 'var(--danger)' }}>Delete</Button>
+                </BulkActionBar>
+
                 <DataTable
+                    selectable
+                    selectedIds={sel.selected}
+                    onSelectionChange={sel.setSelected}
                     data={salaries}
                     columns={columns}
                     searchKey="period"

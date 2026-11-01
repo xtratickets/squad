@@ -16,6 +16,10 @@ interface DataTableProps<T> {
     actions?: (item: T) => React.ReactNode;
     onSearch?: (term: string) => void;
     loading?: boolean;
+    /** Enables a checkbox column. Selection is controlled by the parent. */
+    selectable?: boolean;
+    selectedIds?: Set<string | number>;
+    onSelectionChange?: (ids: Set<string | number>) => void;
 }
 
 function DataTable<T extends { id: string | number }>({
@@ -25,7 +29,10 @@ function DataTable<T extends { id: string | number }>({
     searchPlaceholder = "Search...",
     actions,
     onSearch,
-    loading
+    loading,
+    selectable,
+    selectedIds,
+    onSelectionChange
 }: DataTableProps<T>) {
     const [searchTerm, setSearchTerm] = useState('');
 
@@ -43,6 +50,23 @@ function DataTable<T extends { id: string | number }>({
             const value = (item as Record<string, unknown>)[searchKey as string];
             return String(value).toLowerCase().includes(searchTerm.toLowerCase());
         });
+
+    const selected = selectedIds ?? new Set<string | number>();
+    const visibleSelected = filteredData.filter(item => selected.has(item.id)).length;
+    const allVisibleSelected = filteredData.length > 0 && visibleSelected === filteredData.length;
+
+    const toggleAll = () => {
+        const next = new Set(selected);
+        if (allVisibleSelected) filteredData.forEach(item => next.delete(item.id));
+        else filteredData.forEach(item => next.add(item.id));
+        onSelectionChange?.(next);
+    };
+
+    const toggleOne = (id: string | number) => {
+        const next = new Set(selected);
+        if (next.has(id)) next.delete(id); else next.add(id);
+        onSelectionChange?.(next);
+    };
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', position: 'relative' }}>
@@ -73,6 +97,18 @@ function DataTable<T extends { id: string | number }>({
                     <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '600px' }}>
                         <thead>
                             <tr style={{ background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid var(--border)' }}>
+                                {selectable && (
+                                    <th style={{ padding: '20px', width: '44px' }}>
+                                        <input
+                                            type="checkbox"
+                                            aria-label="Select all rows"
+                                            checked={allVisibleSelected}
+                                            ref={el => { if (el) el.indeterminate = visibleSelected > 0 && !allVisibleSelected; }}
+                                            onChange={toggleAll}
+                                            style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: 'var(--primary)' }}
+                                        />
+                                    </th>
+                                )}
                                 {columns.map((col, idx) => (
                                     <th key={idx} style={{ padding: '20px' }}>{col.header}</th>
                                 ))}
@@ -81,7 +117,18 @@ function DataTable<T extends { id: string | number }>({
                         </thead>
                         <tbody>
                             {filteredData.map((item) => (
-                                <tr key={item.id} className="data-table-row">
+                                <tr key={item.id} className="data-table-row" style={selectable && selected.has(item.id) ? { background: 'rgba(0,230,118,0.06)' } : undefined}>
+                                    {selectable && (
+                                        <td style={{ padding: '20px', width: '44px' }}>
+                                            <input
+                                                type="checkbox"
+                                                aria-label="Select row"
+                                                checked={selected.has(item.id)}
+                                                onChange={() => toggleOne(item.id)}
+                                                style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: 'var(--primary)' }}
+                                            />
+                                        </td>
+                                    )}
                                     {columns.map((col, idx) => (
                                         <td key={idx} style={{ padding: '20px' }}>
                                             {col.render ? col.render(item) : String((item as Record<string, unknown>)[col.key as string] ?? '')}

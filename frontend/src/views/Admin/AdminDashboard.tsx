@@ -12,14 +12,15 @@ import TransactionHistory from './TransactionHistory';
 import Settings from './Settings';
 import ShiftManagement from './ShiftManagement';
 import PromoCodeManagement from './PromoCodeManagement';
+import SessionsReport from './SessionsReport';
 import {
     BarChart3, Users, Home, Box, Settings as SettingsIcon,
-    CreditCard, Briefcase, Calendar, ScrollText, History, Clock, Tag
+    CreditCard, Briefcase, Calendar, ScrollText, History, Clock, Tag, Activity
 } from 'lucide-react';
 import GlassPanel from '../../components/common/GlassPanel';
 
 type SubView =
-    | 'analytics' | 'users' | 'rooms' | 'products' | 'sales'
+    | 'analytics' | 'users' | 'rooms' | 'products' | 'sales' | 'sessions'
     | 'expenses' | 'salaries' | 'reservations'
     | 'inventory' | 'transactions' | 'shifts' | 'settings' | 'promoCodes';
 
@@ -33,6 +34,7 @@ const AdminDashboard: React.FC = () => {
             case 'rooms': return <RoomManagement />;
             case 'products': return <ProductManagement />;
             case 'sales': return <ProductSales />;
+            case 'sessions': return <SessionsReport />;
             case 'expenses': return <ExpensesManagement />;
             case 'salaries': return <SalaryManagement />;
             case 'reservations': return <ReservationsManagement />;
@@ -62,6 +64,7 @@ const AdminDashboard: React.FC = () => {
                 <AdminTab active={subView === 'rooms'} onClick={() => setSubView('rooms')} icon={<Home size={17} />} label="Rooms" />
                 <AdminTab active={subView === 'products'} onClick={() => setSubView('products')} icon={<Box size={17} />} label="Products" />
                 <AdminTab active={subView === 'sales'} onClick={() => setSubView('sales')} icon={<BarChart3 size={17} />} label="Sales Report" />
+                <AdminTab active={subView === 'sessions'} onClick={() => setSubView('sessions')} icon={<Activity size={17} />} label="Sessions" />
                 <AdminTab active={subView === 'expenses'} onClick={() => setSubView('expenses')} icon={<CreditCard size={17} />} label="Expenses" />
                 <AdminTab active={subView === 'salaries'} onClick={() => setSubView('salaries')} icon={<Briefcase size={17} />} label="Salaries" />
                 <AdminTab active={subView === 'reservations'} onClick={() => setSubView('reservations')} icon={<Calendar size={17} />} label="Reservations" />

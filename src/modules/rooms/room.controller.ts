@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { prisma } from '../../services/prisma.service';
 import { BillingService } from '../../services/billing.service';
 import { logger } from '../../utils/logger';
+import { sendDbError } from '../../utils/db-errors';
 
 export const listRooms = async (req: Request, res: Response) => {
     try {
@@ -174,12 +175,15 @@ export const deleteRoom = async (req: Request, res: Response) => {
     const id = req.params.id as string;
 
     try {
+        const room = await prisma.room.findUnique({ where: { id }, select: { status: true } });
+        if (room?.status === 'occupied') {
+            return res.status(409).json({ error: 'Cannot delete a room with an active session' });
+        }
         await prisma.room.delete({
             where: { id },
         });
         res.status(204).send();
     } catch (error) {
-        logger.error(error, 'Error deleting room');
-        res.status(500).json({ error: 'Internal server error' });
+        sendDbError(res, error, 'Error deleting room', 'room (it has session or reservation history)');
     }
 };

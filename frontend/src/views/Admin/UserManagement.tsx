@@ -6,10 +6,15 @@ import DataTable from '../../components/common/DataTable';
 import Button from '../../components/common/Button';
 import { Input, Select } from '../../components/common/FormElements';
 import GlassPanel from '../../components/common/GlassPanel';
+import BulkActionBar from '../../components/common/BulkActionBar';
+import { useSelection, runBulk } from '../../hooks/useSelection';
 import type { User, Role } from '../../types';
 
 const UserManagement: React.FC = () => {
     const [users, setUsers] = useState<User[]>([]);
+    const sel = useSelection();
+    const { prune } = sel;
+    useEffect(() => { prune(users.map(u => u.id)); }, [users, prune]);
     const [roles, setRoles] = useState<Role[]>([]);
     const [isEditing, setIsEditing] = useState<string | null>(null);
     const [isCreating, setIsCreating] = useState(false);
@@ -92,6 +97,13 @@ const UserManagement: React.FC = () => {
         }
     };
 
+    const handleBulkDelete = async () => {
+        if (!window.confirm(`Delete ${sel.selected.size} user(s)? This cannot be undone.`)) return;
+        await runBulk(sel.ids, id => adminService.deleteUser(id), 'Deleted');
+        sel.clear();
+        void loadData();
+    };
+
     const columns = [
         {
             header: 'Username',
@@ -142,7 +154,14 @@ const UserManagement: React.FC = () => {
             )}
 
             <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <BulkActionBar count={sel.selected.size} onClear={sel.clear}>
+                    <Button size="small" variant="secondary" onClick={handleBulkDelete} icon={<Trash2 size={14} />} style={{ color: 'var(--danger)' }}>Delete</Button>
+                </BulkActionBar>
+
                 <DataTable
+                    selectable
+                    selectedIds={sel.selected}
+                    onSelectionChange={sel.setSelected}
                     data={users}
                     columns={columns}
                     searchKey="username"

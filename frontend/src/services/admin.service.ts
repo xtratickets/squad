@@ -15,6 +15,31 @@ interface CreateOrderData { type: string; shiftId: string; items: { productId: s
 interface OrderItemSummary { id: string; productId: string; qty: number; unitPrice: number; total: number; product?: { id: string; name: string; price: number }; }
 interface OrderSummary { id: string; type: string; status: string; shiftId: string; roomId?: string; sessionId?: string; items: OrderItemSummary[]; orderCharge?: { finalTotal: number } | null; createdAt: string; }
 
+export interface MonthlySalesRow {
+    month: string;
+    sessionsRevenue: number;
+    ordersRevenue: number;
+    totalRevenue: number;
+    sessionsCount: number;
+    ordersCount: number;
+    expenses: number;
+    salaries: number;
+    net: number;
+}
+
+export interface SessionRow {
+    id: string;
+    status: 'active' | 'closed' | 'cancelled';
+    startTime: string;
+    endTime?: string | null;
+    room?: { id: string; name: string };
+    staffUsername?: string | null;
+    sessionCharge?: { durationMinutes: number; roomAmount: number; ordersAmount: number; discount: number; serviceFee: number; tax: number; tip: number; finalTotal: number } | null;
+    payments: { id: string; amount: number; mode: { name: string } }[];
+}
+
+export interface ProductSaleRow { id: string; name: string; categoryName: string; totalQty: number; totalRevenue: number; }
+
 interface PaginatedOrders {
     data: OrderSummary[];
     total: number;
@@ -67,6 +92,8 @@ export const adminService = {
     deleteCategory: (id: string) => api.delete(`/products/categories/${id}`),
     addStock: (id: string, qty: number, type: string, reference: string) =>
         api.post(`/products/${id}/stock`, { qty, type, reference }),
+    resetStock: (opts: { productIds?: string[]; categoryId?: string; quantity?: number }) =>
+        api.post<{ updated: number; quantity: number }>('/products/stock/reset', opts),
     endSession: (sessionId: string, closedShiftId: string, promoCode?: string) =>
         api.post(`/sessions/${sessionId}/end`, { closedShiftId, promoCode }),
 
@@ -112,10 +139,12 @@ export const adminService = {
         const q = params.toString();
         return api.get<{ data: Payment[]; total: number; page: number; pageSize: number; totalPages: number }>(`/payments${q ? `?${q}` : ''}`);
     },
-    getStockMovements: (opts?: { page?: number; pageSize?: number }) => {
+    getStockMovements: (opts?: { page?: number; pageSize?: number; startDate?: string; endDate?: string }) => {
         const params = new URLSearchParams();
         if (opts?.page !== undefined) params.append('page', String(opts.page));
         if (opts?.pageSize !== undefined) params.append('pageSize', String(opts.pageSize));
+        if (opts?.startDate) params.append('startDate', opts.startDate);
+        if (opts?.endDate) params.append('endDate', opts.endDate);
         const q = params.toString();
         return api.get<{ data: StockMovement[]; total: number; page: number; pageSize: number; totalPages: number }>(`/products/stock-movements${q ? `?${q}` : ''}`);
     },
@@ -130,6 +159,16 @@ export const adminService = {
     },
     closeShift: (id: string, data: CloseShiftData) => api.post<Shift>(`/shifts/${id}/close`, data),
     getShiftHistory: () => api.get<Shift[]>('/shifts/history'),
+
+    // Sales & sessions reports
+    getMonthlySales: (year: number) =>
+        api.get<{ year: number; timeZone: string; months: MonthlySalesRow[] }>('/reports/monthly-sales', {
+            params: { year, tz: Intl.DateTimeFormat().resolvedOptions().timeZone },
+        }),
+    getProductSales: (opts: { startDate?: string; endDate?: string; categoryId?: string; page?: number; pageSize?: number }) =>
+        api.get<{ data: ProductSaleRow[]; total: number; page: number; pageSize: number; totalPages: number }>('/reports/product-sales', { params: opts }),
+    getSessions: (opts?: { page?: number; pageSize?: number; startDate?: string; endDate?: string; status?: string }) =>
+        api.get<{ data: SessionRow[]; total: number; page: number; pageSize: number; totalPages: number }>('/sessions', { params: opts }),
 
     // Analytics
     getGlobalStats: () => api.get<GlobalStats>('/reports/global'),

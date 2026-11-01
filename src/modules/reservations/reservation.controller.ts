@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { prisma } from '../../services/prisma.service';
 import { logger } from '../../utils/logger';
+import { sendDbError } from '../../utils/db-errors';
 import { broadcast } from '../../websocket/socket';
 
 export const createReservation = async (req: any, res: Response) => {
@@ -117,7 +118,6 @@ export const deleteReservation = async (req: Request, res: Response) => {
         await prisma.reservation.delete({ where: { id } });
         res.status(204).send();
     } catch (error) {
-        logger.error(error, 'Error deleting reservation');
-        res.status(500).json({ error: 'Internal server error' });
+        sendDbError(res, error, 'Error deleting reservation', 'reservation');
     }
 };

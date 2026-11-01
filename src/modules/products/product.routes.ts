@@ -17,6 +17,7 @@ router.get('/', authenticate, productController.getProducts);
 router.post('/', authenticate, authorize(['ADMIN', 'OPERATION']), upload.single('image'), productController.createProduct);
 router.patch('/:id', authenticate, authorize(['ADMIN', 'OPERATION']), upload.single('image'), productController.updateProduct);
 router.delete('/:id', authenticate, authorize(['ADMIN', 'OPERATION']), productController.deleteProduct);
+router.post('/stock/reset', authenticate, authorize(['ADMIN']), productController.resetStock);
 router.post('/:id/stock', authenticate, authorize(['ADMIN', 'OPERATION']), productController.addStock);
 
 router.get('/stock-movements', authenticate, productController.getStockMovements);

@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { prisma } from '../../services/prisma.service';
 import { logger } from '../../utils/logger';
+import { sendDbError } from '../../utils/db-errors';
 
 export const createPromoCode = async (req: Request, res: Response) => {
     const { code, type, value, expiry, usageLimit, applyTo } = req.body;
@@ -17,8 +18,7 @@ export const createPromoCode = async (req: Request, res: Response) => {
         });
         res.status(201).json(promo);
     } catch (error) {
-        logger.error(error, 'Error creating promocode');
-        res.status(500).json({ error: 'Internal server error' });
+        sendDbError(res, error, 'Error creating promocode', 'promo code');
     }
 };
 
@@ -63,8 +63,7 @@ export const deletePromoCode = async (req: Request, res: Response) => {
         await prisma.promoCode.delete({ where: { id } });
         res.status(204).send();
     } catch (error) {
-        logger.error(error, 'Error deleting promocode');
-        res.status(500).json({ error: 'Internal server error' });
+        sendDbError(res, error, 'Error deleting promocode', 'promo code');
     }
 };
 

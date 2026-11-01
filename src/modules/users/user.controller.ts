@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { prisma } from '../../services/prisma.service';
 import { logger } from '../../utils/logger';
+import { sendDbError } from '../../utils/db-errors';
 
 export const getUsers = async (req: Request, res: Response) => {
     try {
@@ -34,6 +35,10 @@ export const getUsers = async (req: Request, res: Response) => {
 export const createUser = async (req: Request, res: Response) => {
     const { username, password, roleId } = req.body;
 
+    if (!username || !password || !roleId) {
+        return res.status(400).json({ error: 'username, password and roleId are required' });
+    }
+
     try {
         const hashedPassword = await bcrypt.hash(password, 10);
         const user = await prisma.user.create({
@@ -49,8 +54,7 @@ export const createUser = async (req: Request, res: Response) => {
         delete user.password;
         res.status(201).json(user);
     } catch (error) {
-        logger.error(error, 'Error creating user');
-        res.status(500).json({ error: 'Internal server error' });
+        sendDbError(res, error, 'Error creating user', 'user');
     }
 };
 
@@ -74,8 +78,7 @@ export const updateUser = async (req: Request, res: Response) => {
         delete user.password;
         res.json(user);
     } catch (error) {
-        logger.error(error, 'Error updating user');
-        res.status(500).json({ error: 'Internal server error' });
+        sendDbError(res, error, 'Error updating user', 'user');
     }
 };
 
@@ -88,8 +91,12 @@ export const getRoles = async (req: Request, res: Response) => {
         res.status(500).json({ error: 'Internal server error' });
     }
 };
-export const deleteUser = async (req: Request, res: Response) => {
+export const deleteUser = async (req: any, res: Response) => {
     const id = req.params.id as string;
+
+    if (req.user?.userId === id) {
+        return res.status(400).json({ error: 'You cannot delete your own account' });
+    }
 
     try {
         await prisma.user.delete({
@@ -97,8 +104,7 @@ export const deleteUser = async (req: Request, res: Response) => {
         });
         res.status(204).send();
     } catch (error) {
-        logger.error(error, 'Error deleting user');
-        res.status(500).json({ error: 'Internal server error' });
+        sendDbError(res, error, 'Error deleting user', 'user');
     }
 };
 // For selection lists (e.g. owners), returns simplified objects

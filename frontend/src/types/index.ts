@@ -121,7 +121,7 @@ export interface StockMovement {
     productId: string;
     product?: Product;
     qty: number;
-    type: 'add' | 'deduct' | 'restock' | 'sale' | 'adjustment';
+    type: 'add' | 'deduct' | 'restock' | 'sale' | 'adjustment' | 'reset';
     reference?: string;
     createdAt: string;
 }

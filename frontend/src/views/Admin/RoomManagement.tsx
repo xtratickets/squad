@@ -6,10 +6,15 @@ import DataTable from '../../components/common/DataTable';
 import Button from '../../components/common/Button';
 import { Input } from '../../components/common/FormElements';
 import GlassPanel from '../../components/common/GlassPanel';
+import BulkActionBar from '../../components/common/BulkActionBar';
+import { useSelection, runBulk } from '../../hooks/useSelection';
 import type { Room } from '../../types';
 
 const RoomManagement: React.FC = () => {
     const [rooms, setRooms] = useState<Room[]>([]);
+    const sel = useSelection();
+    const { prune } = sel;
+    useEffect(() => { prune(rooms.map(r => r.id)); }, [rooms, prune]);
     const [isEditing, setIsEditing] = useState<string | null>(null);
     const [isCreating, setIsCreating] = useState(false);
     const [formData, setFormData] = useState({ name: '', category: '', pricePerHour: 0, minMinutes: 0, displayOrder: 0, status: 'available' });
@@ -88,6 +93,22 @@ const RoomManagement: React.FC = () => {
                 ? (err as { response?: { data?: { error?: string } } }).response?.data?.error : undefined;
             toast.error(msg || 'Error deleting room');
         }
+    };
+
+    const handleBulkDelete = async () => {
+        if (!window.confirm(`Delete ${sel.selected.size} room(s)? Rooms with history or an active session will be skipped.`)) return;
+        await runBulk(sel.ids, id => adminService.deleteRoom(id), 'Deleted');
+        sel.clear();
+        void loadRooms();
+    };
+
+    const handleBulkStatus = async (status: string) => {
+        // Occupied rooms are driven by sessions; never override them from here.
+        const targets = rooms.filter(r => sel.selected.has(r.id) && r.status !== 'occupied');
+        if (targets.length === 0) return toast.error('Occupied rooms cannot be changed manually');
+        await runBulk(targets.map(r => r.id), id => adminService.updateRoom(id, { status }), `Set to ${status}`);
+        sel.clear();
+        void loadRooms();
     };
 
     const columns = [
@@ -183,7 +204,17 @@ const RoomManagement: React.FC = () => {
             )}
 
             <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <BulkActionBar count={sel.selected.size} onClear={sel.clear}>
+                    <Button size="small" variant="secondary" onClick={() => handleBulkStatus('available')}>Set available</Button>
+                    <Button size="small" variant="secondary" onClick={() => handleBulkStatus('maintenance')}>Set maintenance</Button>
+                    <Button size="small" variant="secondary" onClick={() => handleBulkStatus('cleaning')}>Set cleaning</Button>
+                    <Button size="small" variant="secondary" onClick={handleBulkDelete} icon={<Trash2 size={14} />} style={{ color: 'var(--danger)' }}>Delete</Button>
+                </BulkActionBar>
+
                 <DataTable
+                    selectable
+                    selectedIds={sel.selected}
+                    onSelectionChange={sel.setSelected}
                     data={rooms}
                     columns={columns}
                     searchKey="name"

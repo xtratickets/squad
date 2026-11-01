@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { adminService } from '../../services/admin.service';
-import { Receipt, ArrowRight, Wallet, CreditCard, Banknote, Download, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Receipt, ArrowRight, Wallet, CreditCard, Banknote, ChevronLeft, ChevronRight } from 'lucide-react';
 import DataTable from '../../components/common/DataTable';
 import Button from '../../components/common/Button';
+import ExportButtons from '../../components/common/ExportButtons';
 import type { Payment } from '../../types';
-import * as XLSX from 'xlsx';
 
 const TransactionHistory: React.FC = () => {
     const [payments, setPayments] = useState<Payment[]>([]);
@@ -40,24 +40,18 @@ const TransactionHistory: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     useEffect(() => { void loadData(); }, [page, pageSize, fromDate, toDate]);
 
-    const exportToExcel = () => {
-        const worksheetData = payments.map(p => ({
-            'Reference Type': p.referenceType.toUpperCase(),
-            'Reference ID': p.referenceId,
-            'Mode': p.mode.name,
-            'Amount (EGP)': p.amount,
-            'Staff': p.shift?.staff?.username ?? 'System',
-            'Date': new Date(p.createdAt).toLocaleString(),
-        }));
+    const exportColumns = [
+        { header: 'Reference Type', value: (p: Payment) => p.referenceType.toUpperCase() },
+        { header: 'Reference ID', value: (p: Payment) => p.referenceId },
+        { header: 'Mode', value: (p: Payment) => p.mode.name },
+        { header: 'Amount (EGP)', value: (p: Payment) => p.amount },
+        { header: 'Staff', value: (p: Payment) => p.shift?.staff?.username ?? 'System' },
+        { header: 'Date', value: (p: Payment) => new Date(p.createdAt).toLocaleString() },
+    ];
 
-        const ws = XLSX.utils.json_to_sheet(worksheetData);
-        ws['!cols'] = [{ wch: 20 }, { wch: 40 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 20 }];
-
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Transactions");
-
-        const fileName = `Transactions_Page${page}_${fromDate || 'All'}_to_${toDate || 'All'}.xlsx`;
-        XLSX.writeFile(wb, fileName);
+    const fetchAllPayments = async () => {
+        const res = await adminService.getPayments({ page: 1, pageSize: 10000, startDate: fromDate || undefined, endDate: toDate || undefined });
+        return res.data.data;
     };
 
     const getModeIcon = (modeName: string) => {
@@ -137,9 +131,20 @@ const TransactionHistory: React.FC = () => {
                             style={{ padding: '6px 10px', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)', color: 'var(--text)', borderRadius: '6px', fontSize: '13px' }}
                         />
                     </div>
-                    <Button variant="secondary" onClick={exportToExcel} icon={<Download size={16} />} style={{ marginLeft: '4px', padding: '6px 12px' }}>
-                        Export Page
-                    </Button>
+                    <ExportButtons
+                        title="Transactions Report"
+                        filename={`Transactions_${fromDate || 'All'}_to_${toDate || 'All'}`}
+                        columns={exportColumns}
+                        getRows={fetchAllPayments}
+                        summary={rows => {
+                            const byMode = new Map<string, number>();
+                            rows.forEach(p => byMode.set(p.mode.name, (byMode.get(p.mode.name) ?? 0) + p.amount));
+                            return [
+                                { label: 'Total collected', value: `EGP ${Math.round(rows.reduce((s, p) => s + p.amount, 0)).toLocaleString()}` },
+                                ...[...byMode].map(([name, amt]) => ({ label: name, value: `EGP ${Math.round(amt).toLocaleString()}` })),
+                            ];
+                        }}
+                    />
                 </div>
             </div>
 

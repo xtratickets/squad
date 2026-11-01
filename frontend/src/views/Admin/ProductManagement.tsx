@@ -1,15 +1,21 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import toast from 'react-hot-toast';
 import { adminService } from '../../services/admin.service';
-import { Plus, Edit, Check, X, Trash2, PackagePlus, Tag, Image as ImageIcon, Upload, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Edit, Check, X, Trash2, PackagePlus, Tag, Image as ImageIcon, Upload, ChevronLeft, ChevronRight, RotateCcw } from 'lucide-react';
 import DataTable from '../../components/common/DataTable';
 import Button from '../../components/common/Button';
 import { Input, Select } from '../../components/common/FormElements';
 import GlassPanel from '../../components/common/GlassPanel';
+import BulkActionBar from '../../components/common/BulkActionBar';
+import ExportButtons from '../../components/common/ExportButtons';
+import { useSelection, runBulk } from '../../hooks/useSelection';
 import type { Product, Category } from '../../types';
 
 const ProductManagement: React.FC = () => {
     const [products, setProducts] = useState<Product[]>([]);
+    const sel = useSelection();
+    const { prune } = sel;
+    const [bulkCategoryId, setBulkCategoryId] = useState('');
     const [categories, setCategories] = useState<Category[]>([]);
     const [isEditing, setIsEditing] = useState<string | null>(null);
     const [isCreating, setIsCreating] = useState(false);
@@ -21,6 +27,7 @@ const ProductManagement: React.FC = () => {
     const [imageFile, setImageFile] = useState<File | null>(null);
     const [imagePreview, setImagePreview] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
+    const [initialLoad, setInitialLoad] = useState(true);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const [page, setPage] = useState(1);
@@ -50,25 +57,46 @@ const ProductManagement: React.FC = () => {
                 }),
                 adminService.getCategories(),
             ]);
-            setProducts(pRes.data.data || pRes.data);
+            const list = pRes.data.data || pRes.data;
+            setProducts(list);
+            prune(list.map((p: Product) => p.id));
             setTotalPages(pRes.data.totalPages || 1);
             setTotalProducts(pRes.data.total || 0);
 
             setCategories(cRes.data);
-            if (cRes.data.length > 0 && !formData.categoryId) {
-                setFormData(prev => ({ ...prev, categoryId: cRes.data[0].id }));
-            }
         } catch (err) {
             console.error('Error loading products', err);
         } finally {
             setLoading(false);
+            setInitialLoad(false);
         }
-    }, [formData.categoryId, page, debouncedSearch, selectedCategoryId, pageSize]);
+    }, [page, debouncedSearch, selectedCategoryId, pageSize, prune]);
+
+    // Default the create-form category once categories are known.
+    useEffect(() => {
+        if (categories.length > 0 && !formData.categoryId) {
+            setFormData(prev => ({ ...prev, categoryId: categories[0].id }));
+        }
+    }, [categories, formData.categoryId]);
+
+    // A new search / category filter must start from the first page.
+    useEffect(() => { setPage(1); }, [debouncedSearch, selectedCategoryId]);
 
     useEffect(() => { loadData(); }, [loadData]);
 
+    const validProductForm = () => {
+        const { name, price, cost, stockQty } = formData;
+        if (!name.trim()) { toast.error('Product name is required'); return false; }
+        if (![price, cost, stockQty].every(Number.isFinite) || price < 0 || cost < 0 || stockQty < 0) {
+            toast.error('Price, cost and stock must be valid non-negative numbers');
+            return false;
+        }
+        return true;
+    };
+
     const handleCreate = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (!validProductForm()) return;
         try {
             const data = new FormData();
             data.append('name', formData.name);
@@ -95,6 +123,7 @@ const ProductManagement: React.FC = () => {
     };
 
     const handleUpdate = async (id: string) => {
+        if (!validProductForm()) return;
         try {
             const data = new FormData();
             data.append('name', formData.name);
@@ -133,6 +162,7 @@ const ProductManagement: React.FC = () => {
     };
 
     const handleAddStock = async (productId: string) => {
+        if (!Number.isInteger(stockForm.qty) || stockForm.qty === 0) return toast.error('Enter a non-zero whole quantity');
         try {
             await adminService.addStock(productId, stockForm.qty, stockForm.type, stockForm.reference);
             setStockTarget(null);
@@ -144,6 +174,78 @@ const ProductManagement: React.FC = () => {
                 ? (err as { response?: { data?: { error?: string } } }).response?.data?.error : undefined;
             toast.error(msg || 'Error adding stock');
         }
+    };
+
+    const handleResetStock = async () => {
+        const catName = categories.find(c => c.id === selectedCategoryId)?.name;
+        const scope = selectedCategoryId === 'all' ? 'ALL products' : `all products in "${catName}"`;
+        if (!window.confirm(`Reset stock to 0 for ${scope}? This cannot be undone.`)) return;
+        try {
+            const res = await adminService.resetStock({
+                categoryId: selectedCategoryId === 'all' ? undefined : selectedCategoryId,
+                quantity: 0,
+            });
+            loadData();
+            toast.success(`Stock reset for ${res.data.updated} products`);
+        } catch (err: unknown) {
+            const msg = err && typeof err === 'object' && 'response' in err
+                ? (err as { response?: { data?: { error?: string } } }).response?.data?.error : undefined;
+            toast.error(msg || 'Error resetting stock');
+        }
+    };
+
+    const handleBulkDelete = async () => {
+        if (!window.confirm(`Delete ${sel.selected.size} product(s)? Products with sales history will be skipped.`)) return;
+        await runBulk(sel.ids, id => adminService.deleteProduct(id), 'Deleted');
+        sel.clear();
+        void loadData();
+    };
+
+    const handleBulkResetStock = async () => {
+        if (!window.confirm(`Reset stock to 0 for ${sel.selected.size} selected product(s)?`)) return;
+        try {
+            const res = await adminService.resetStock({ productIds: sel.ids, quantity: 0 });
+            toast.success(`Stock reset for ${res.data.updated} products`);
+            sel.clear();
+            void loadData();
+        } catch (err: unknown) {
+            const msg = err && typeof err === 'object' && 'response' in err
+                ? (err as { response?: { data?: { error?: string } } }).response?.data?.error : undefined;
+            toast.error(msg || 'Error resetting stock');
+        }
+    };
+
+    const handleBulkMove = async () => {
+        if (!bulkCategoryId) return toast.error('Choose a category first');
+        const name = categories.find(c => c.id === bulkCategoryId)?.name;
+        if (!window.confirm(`Move ${sel.selected.size} product(s) to "${name}"?`)) return;
+        const move = (id: string) => {
+            const body = new FormData();
+            body.append('categoryId', bulkCategoryId);
+            return adminService.updateProduct(id, body);
+        };
+        await runBulk(sel.ids, move, 'Moved');
+        sel.clear();
+        setBulkCategoryId('');
+        void loadData();
+    };
+
+    const exportColumns = [
+        { header: 'Product', value: (p: Product) => p.name },
+        { header: 'Category', value: (p: Product) => p.category?.name ?? categories.find(c => c.id === p.categoryId)?.name ?? '' },
+        { header: 'Price (EGP)', value: (p: Product) => p.price },
+        { header: 'Cost (EGP)', value: (p: Product) => p.cost },
+        { header: 'Stock', value: (p: Product) => p.stockQty },
+        { header: 'Stock Value at Cost (EGP)', value: (p: Product) => p.stockQty * p.cost },
+        { header: 'Status', value: (p: Product) => p.stockQty === 0 ? 'Out of stock' : p.stockQty < 5 ? 'Low' : 'OK' },
+    ];
+
+    const fetchAllProducts = async () => {
+        const res = await adminService.getProducts({
+            page: 1, pageSize: 10000,
+            categoryId: selectedCategoryId === 'all' ? undefined : selectedCategoryId,
+        });
+        return res.data.data;
     };
 
     const handleCreateCategory = async (e: React.FormEvent) => {
@@ -273,16 +375,31 @@ const ProductManagement: React.FC = () => {
         },
     ];
 
-    if (loading) return <div style={{ color: 'var(--text-muted)' }}>Loading products...</div>;
+    if (initialLoad) return <div style={{ color: 'var(--text-muted)' }}>Loading products...</div>;
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '30px', height: '100%', paddingBottom: '20px' }}>
             {/* Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
                 <h2 style={{ fontSize: '24px', fontWeight: '600' }}>Product & Inventory</h2>
-                <div style={{ display: 'flex', gap: '10px' }}>
+                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
+                    <ExportButtons
+                        title="Stock Report"
+                        filename="Stock_Report"
+                        columns={exportColumns}
+                        getRows={fetchAllProducts}
+                        summary={rows => [
+                            { label: 'Products', value: rows.length },
+                            { label: 'Units in stock', value: rows.reduce((s, p) => s + p.stockQty, 0) },
+                            { label: 'Stock value at cost', value: `EGP ${Math.round(rows.reduce((s, p) => s + p.stockQty * p.cost, 0)).toLocaleString()}` },
+                            { label: 'Low / out of stock', value: rows.filter(p => p.stockQty < 5).length },
+                        ]}
+                    />
                     <Button variant="secondary" size="small" onClick={() => setShowCategoryForm(v => !v)} icon={<Tag size={16} />}>
                         Categories
+                    </Button>
+                    <Button variant="secondary" size="small" onClick={handleResetStock} icon={<RotateCcw size={16} />} style={{ color: 'var(--danger)' }}>
+                        Reset {selectedCategoryId === 'all' ? 'All' : 'Category'} Stock
                     </Button>
                     <Button onClick={() => setIsCreating(true)} icon={<Plus size={18} />}>
                         Add Product
@@ -431,7 +548,24 @@ const ProductManagement: React.FC = () => {
 
             {/* Products Table */}
             <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <BulkActionBar count={sel.selected.size} onClear={sel.clear}>
+                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                        <Select
+                            value={bulkCategoryId}
+                            onChange={e => setBulkCategoryId(e.target.value)}
+                            style={{ padding: '6px 10px', fontSize: '13px' }}
+                            options={[{ value: '', label: 'Move to category…' }, ...categories.map(c => ({ value: c.id, label: c.name }))]}
+                        />
+                        <Button size="small" variant="secondary" onClick={handleBulkMove} disabled={!bulkCategoryId}>Move</Button>
+                    </div>
+                    <Button size="small" variant="secondary" onClick={handleBulkResetStock} icon={<RotateCcw size={14} />}>Reset stock</Button>
+                    <Button size="small" variant="secondary" onClick={handleBulkDelete} icon={<Trash2 size={14} />} style={{ color: 'var(--danger)' }}>Delete</Button>
+                </BulkActionBar>
+
                 <DataTable
+                    selectable
+                    selectedIds={sel.selected}
+                    onSelectionChange={sel.setSelected}
                     data={products}
                     columns={columns}
                     searchKey="name"

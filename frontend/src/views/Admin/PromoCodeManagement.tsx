@@ -4,6 +4,8 @@ import api from '../../services/api';
 import GlassPanel from '../../components/common/GlassPanel';
 import Button from '../../components/common/Button';
 import { Input } from '../../components/common/FormElements';
+import BulkActionBar from '../../components/common/BulkActionBar';
+import { useSelection, runBulk } from '../../hooks/useSelection';
 import { Tag, Trash2, Edit3, X, Check } from 'lucide-react';
 
 interface PromoCode {
@@ -29,6 +31,9 @@ const emptyForm = { code: '', type: 'percent' as 'percent' | 'fixed', value: '',
 
 const PromoCodeManagement: React.FC = () => {
     const [promos, setPromos] = useState<PromoCode[]>([]);
+    const sel = useSelection();
+    const { prune } = sel;
+    useEffect(() => { prune(promos.map(p => p.id)); }, [promos, prune]);
     const [loading, setLoading] = useState(true);
     const [form, setForm] = useState(emptyForm);
     const [submitting, setSubmitting] = useState(false);
@@ -61,6 +66,9 @@ const PromoCodeManagement: React.FC = () => {
 
     const submit = async () => {
         if (!form.code || !form.value) return toast.error('Code and value are required');
+        const numericValue = parseFloat(form.value);
+        if (!Number.isFinite(numericValue) || numericValue <= 0) return toast.error('Value must be greater than 0');
+        if (form.type === 'percent' && numericValue > 100) return toast.error('Percent discount cannot exceed 100');
         setSubmitting(true);
         try {
             const payload = {
@@ -81,7 +89,11 @@ const PromoCodeManagement: React.FC = () => {
             setForm(emptyForm);
             setEditingId(null);
             void load();
-        } catch { toast.error('Failed to save promo code'); }
+        } catch (err: unknown) {
+            const msg = err && typeof err === 'object' && 'response' in err
+                ? (err as { response?: { data?: { error?: string } } }).response?.data?.error : undefined;
+            toast.error(msg || 'Failed to save promo code');
+        }
         finally { setSubmitting(false); }
     };
 
@@ -91,7 +103,11 @@ const PromoCodeManagement: React.FC = () => {
             await api.delete(`/promocodes/${id}`);
             toast.success('Deleted');
             void load();
-        } catch { toast.error('Failed to delete'); }
+        } catch (err: unknown) {
+            const msg = err && typeof err === 'object' && 'response' in err
+                ? (err as { response?: { data?: { error?: string } } }).response?.data?.error : undefined;
+            toast.error(msg || 'Failed to delete');
+        }
     };
 
     const toggleActive = async (p: PromoCode) => {
@@ -100,6 +116,27 @@ const PromoCodeManagement: React.FC = () => {
             setPromos(prev => prev.map(r => r.id === p.id ? { ...r, active: !r.active } : r));
         } catch { toast.error('Failed to update'); }
     };
+
+    const handleBulkDelete = async () => {
+        if (!window.confirm(`Delete ${sel.selected.size} promo code(s)?`)) return;
+        await runBulk(sel.ids, id => api.delete(`/promocodes/${id}`), 'Deleted');
+        sel.clear();
+        void load();
+    };
+
+    const handleBulkActive = async (active: boolean) => {
+        await runBulk(sel.ids, id => api.patch(`/promocodes/${id}`, { active }), active ? 'Enabled' : 'Disabled');
+        sel.clear();
+        void load();
+    };
+
+    const allSelected = promos.length > 0 && promos.every(p => sel.selected.has(p.id));
+    const toggleAll = () => sel.setSelected(allSelected ? new Set() : new Set(promos.map(p => p.id)));
+    const toggleOne = (id: string) => sel.setSelected(prev => {
+        const next = new Set(prev);
+        if (next.has(id)) next.delete(id); else next.add(id);
+        return next;
+    });
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
@@ -155,14 +192,29 @@ const PromoCodeManagement: React.FC = () => {
 
             {/* List */}
             <GlassPanel style={{ padding: '24px' }}>
-                <h3 style={{ margin: '0 0 20px', fontSize: '16px' }}>Active Promo Codes</h3>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', margin: '0 0 20px' }}>
+                    {promos.length > 0 && (
+                        <input type="checkbox" aria-label="Select all promo codes" checked={allSelected} onChange={toggleAll}
+                            style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: 'var(--primary)' }} />
+                    )}
+                    <h3 style={{ margin: 0, fontSize: '16px' }}>Promo Codes</h3>
+                </div>
+                <div style={{ marginBottom: '16px' }}>
+                    <BulkActionBar count={sel.selected.size} onClear={sel.clear}>
+                        <Button size="small" variant="secondary" onClick={() => void handleBulkActive(true)}>Enable</Button>
+                        <Button size="small" variant="secondary" onClick={() => void handleBulkActive(false)}>Disable</Button>
+                        <Button size="small" variant="secondary" onClick={() => void handleBulkDelete()} icon={<Trash2 size={14} />} style={{ color: 'var(--danger)' }}>Delete</Button>
+                    </BulkActionBar>
+                </div>
                 {loading ? <div style={{ color: 'var(--text-muted)', padding: '20px', textAlign: 'center' }}>Loading...</div> : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                         {promos.length === 0 && <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '20px' }}>No promo codes yet.</div>}
                         {promos.map(p => {
                             const opt = applyLabel(p.applyTo ?? 'both');
                             return (
-                                <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px', background: 'rgba(255,255,255,0.03)', borderRadius: '10px', border: '1px solid var(--border)', flexWrap: 'wrap' }}>
+                                <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px', background: sel.selected.has(p.id) ? 'rgba(0,230,118,0.06)' : 'rgba(255,255,255,0.03)', borderRadius: '10px', border: '1px solid var(--border)', flexWrap: 'wrap' }}>
+                                    <input type="checkbox" aria-label={`Select ${p.code}`} checked={sel.selected.has(p.id)} onChange={() => toggleOne(p.id)}
+                                        style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: 'var(--primary)' }} />
                                     <span style={{ fontFamily: 'monospace', fontWeight: 800, fontSize: '15px', color: p.active ? 'var(--primary)' : 'var(--text-muted)', minWidth: '100px' }}>{p.code}</span>
                                     <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>{p.type === 'percent' ? `${p.value}%` : `EGP ${p.value}`}</span>
                                     <span style={{ background: opt.color, color: opt.textColor, fontSize: '11px', padding: '2px 10px', borderRadius: '8px', fontWeight: 700 }}>{opt.label}</span>

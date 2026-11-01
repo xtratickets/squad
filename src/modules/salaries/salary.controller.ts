@@ -1,16 +1,25 @@
 import { Request, Response } from 'express';
 import { prisma } from '../../services/prisma.service';
 import { logger } from '../../utils/logger';
+import { sendDbError } from '../../utils/db-errors';
 
 export const recordSalary = async (req: any, res: Response) => {
     const { staffId, amount, period, shiftId } = req.body;
+
+    const value = Math.round(Number(amount));
+    if (!Number.isFinite(value) || value <= 0) {
+        return res.status(400).json({ error: 'Amount must be a positive number' });
+    }
+    if (!staffId || !period) {
+        return res.status(400).json({ error: 'Staff and period are required' });
+    }
 
     try {
         const salary = await prisma.$transaction(async (tx) => {
             const s = await tx.salary.create({
                 data: {
                     staffId,
-                    amount: Math.round(amount),
+                    amount: value,
                     period,
                     shiftId,
                 },
@@ -21,8 +30,8 @@ export const recordSalary = async (req: any, res: Response) => {
                 await tx.shiftStats.update({
                     where: { shiftId },
                     data: {
-                        salariesTotal: { increment: amount },
-                        totalRevenue: { decrement: amount },
+                        salariesTotal: { increment: value },
+                        totalRevenue: { decrement: value },
                     },
                 });
             }
@@ -63,7 +72,7 @@ export const getSalaries = async (req: Request, res: Response) => {
                 skip: (pageNum - 1) * limit,
                 take: limit,
                 orderBy: [{ createdAt: 'desc' }],
-                include: { staff: true },
+                include: { staff: { select: { id: true, username: true } } }, // never expose password hashes
             }),
             prisma.salary.count({ where })
         ]);
@@ -83,10 +92,21 @@ export const getSalaries = async (req: Request, res: Response) => {
 export const deleteSalary = async (req: Request, res: Response) => {
     const id = req.params.id as string;
     try {
-        await prisma.salary.delete({ where: { id } });
+        // Revert the shift totals that recordSalary applied, atomically with the delete.
+        await prisma.$transaction(async (tx) => {
+            const salary = await tx.salary.delete({ where: { id } });
+            if (salary.shiftId) {
+                await tx.shiftStats.updateMany({
+                    where: { shiftId: salary.shiftId },
+                    data: {
+                        salariesTotal: { decrement: salary.amount },
+                        totalRevenue: { increment: salary.amount },
+                    },
+                });
+            }
+        });
         res.status(204).send();
     } catch (error) {
-        logger.error(error, 'Error deleting salary');
-        res.status(500).json({ error: 'Internal server error' });
+        sendDbError(res, error, 'Error deleting salary', 'salary');
     }
 };

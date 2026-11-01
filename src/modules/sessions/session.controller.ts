@@ -5,14 +5,23 @@ import { logger } from '../../utils/logger';
 import { emitToRoom, broadcast } from '../../websocket/socket';
 import { AuditService } from '../../services/audit.service';
 import { ReceiptService } from '../../services/receipt.service';
+import { buildDateRange } from '../../utils/date-range';
 
 export const listSessions = async (req: Request, res: Response) => {
     const page = parseInt(req.query.page as string) || 1;
     const pageSize = parseInt(req.query.pageSize as string) || 20;
+    const { startDate, endDate, status, roomId } = req.query;
+
+    const where: any = {};
+    const range = buildDateRange(startDate, endDate);
+    if (range) where.startTime = range;
+    if (typeof status === 'string' && status) where.status = status;
+    if (typeof roomId === 'string' && roomId) where.roomId = roomId;
 
     try {
         const [sessions, total] = await Promise.all([
             prisma.session.findMany({
+                where,
                 orderBy: { startTime: 'desc' },
                 skip: (page - 1) * pageSize,
                 take: pageSize,
@@ -22,7 +31,7 @@ export const listSessions = async (req: Request, res: Response) => {
                     openedShift: { include: { staff: { select: { username: true } } } },
                 },
             }),
-            prisma.session.count(),
+            prisma.session.count({ where }),
         ]);
 
         const sessionIds = sessions.map(s => s.id);
@@ -516,11 +525,17 @@ export const cancelSession = async (req: any, res: Response) => {
                 await tx.sessionCharge.delete({ where: { sessionId: id } });
             }
 
-            // 2. Set room to available
-            await tx.room.update({
-                where: { id: session.roomId },
-                data: { status: 'available' },
+            // 2. Free the room only if no other session is still running in it
+            //    (cancelling an old closed session must not free an occupied room).
+            const otherActive = await tx.session.count({
+                where: { roomId: session.roomId, status: 'active', id: { not: id } },
             });
+            if (otherActive === 0) {
+                await tx.room.update({
+                    where: { id: session.roomId },
+                    data: { status: 'available' },
+                });
+            }
 
             // 3. Update session status
             return await tx.session.update({
@@ -531,7 +546,8 @@ export const cancelSession = async (req: any, res: Response) => {
 
         await AuditService.log('Session', id, 'CANCEL', userId, session, result);
         broadcast('session.cancelled', result);
-        broadcast('room.state_updated', { roomId: session.roomId, status: 'available' });
+        const roomNow = await prisma.room.findUnique({ where: { id: session.roomId }, select: { status: true } });
+        broadcast('room.state_updated', { roomId: session.roomId, status: roomNow?.status ?? 'available' });
 
         res.json(result);
     } catch (error) {
